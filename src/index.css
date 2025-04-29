@@ -1,0 +1,114 @@
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* position: relative; */
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  margin: 0;
+  font-size: small;
+}
+
+.root {
+   position:absolute; 
+  height: 100%;
+  width: 100%;
+  margin: 0 0;    
+}
+
+.app  {
+ /* width: 100vw;
+  position: absolute;*/
+  background-color: #0000;
+  /* top:0; */
+  /* left:110; */
+  height: 100%;
+  width: 100%;
+  /* transition: height 0.3s ease-out; */
+  display: flex;
+  flex-direction: row;
+}
+
+
+.map {
+ /* top:0;
+  left:0;
+  /*position: relative;*/
+  /* float: left; */
+  height: 100%;
+    width: 20%;  
+ 
+  /*border: 1px solid darkgray;*/
+}
+
+.wf {
+  /*background-color: chartreuse;
+  top:0;
+  left:0;*/
+  /* position: relative; */
+  /* float: left; */
+  height: 90%;
+   width: 20%; 
+ 
+  /*border: 1px solid darkgray;*/
+}
+
+.wfSB {
+  /*display: flex;*/
+  background-color: rgb(42, 43, 42);
+   position: relative; 
+  /* float: left; */
+  height: 100%;
+    width: 100%;  
+    border-radius: 23;
+    cursor:none;
+ 
+  
+}
+
+
+.canv{
+  
+  /*display: block;
+  position: absolute;
+ float:none; */
+  top: 11;
+  left: 0;
+  width: 100%;
+  height: 100%;  
+}
+
+.testCanv{
+  width: 100%;
+  height: 100%;  
+}
+
+.imgpl
+{
+  position: relative;
+  width: 40px;
+  left:123px;
+  opacity: 0.8;
+}
+
+
+.imgcl
+{
+  position: absolute;
+  
+  
+  top:100px;
+  left:0;
+  background-color: #0000
+  
+}
+
+.info{
+  position: absolute;
+  left:0;
+  background-color: #68686892;
+  visibility: hidden;
+}
