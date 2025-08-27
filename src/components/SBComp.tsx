@@ -140,8 +140,8 @@ export function ScrollbarH(props: ScrollbarHProps) {
 
  createEffect(()=> {
     //thumbRef!.innerText = props.newTop.toString();
-    thumbRef!.innerText = thumbLeft().toString();
-    console.log("width: " + props.wndWidth);
+ //   thumbRef!.innerText = thumbLeft().toString();
+  //  console.log("width: " + props.wndWidth);
     //setThumbTop(props.newTop);
  })
 
@@ -246,9 +246,9 @@ export default function SBComp()
     const [contentHeight, setContentHeight] = createSignal(800);
     const [divWidth, setDivWidth] = createSignal(600);
     const [contentWidth, setContentWidth] = createSignal(800);
-    const [pos, setPos] = createSignal({ x: 0, y: 0 });
-    const [hover, setHover] = createSignal(false);
-    const [ovPos, setOvPos] = createSignal({ left: 8, top: 8 });
+    const [imgPos, setImgPos] = createSignal({ x: 0, y: 0 });
+    const [cliPos, setCliPos] = createSignal({ x: 0, y: 0 });
+    const [hover, setHover] = createSignal(false);    
     const [rgba, setRgba] = createSignal<[number,number,number,number]>([0,0,0,255]);
 
   const updateOverlayPos = () => {
@@ -295,22 +295,32 @@ export default function SBComp()
     if(!canvasRef)
       return;
 
+    let scrX = scrollX();
+    let scrY = scrollY();
+
     const rect = canvasRef.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-    setPos({ x, y });
+    let x = clientX;// - rect.left ;
+    let y = clientY;// - rect.top;
+    setCliPos({ x, y });
+    //x= x+scrX;
+    //y= y+scrY;
+    
 
     const xf =backCanvas.width / canvasRef.width;
     
-    const xb = x*xf;
-    //console.log(xf, xb);
-    const ix = Math.min(canvasRef.width - 1, Math.max(0, Math.floor(x * dpr())));
-    const iy = Math.min(canvasRef.height - 1, Math.max(0, Math.floor(y * dpr())));
+    
+    //const xb = x*xf;
+    
+    const ix = scrX + Math.min(canvasRef.width - 1, Math.max(0, Math.floor(x * dpr())));
+    const iy = scrY + Math.min(canvasRef.height - 1, Math.max(0, Math.floor(y * dpr())));
     //const ctx = canvasRef.getContext("2d", { willReadFrequently: true });
     //const data = ctx!.getImageData(0, 0, 1, 1).data;
-
-    const data = backCtx!.getImageData(ix, iy, 1, 1).data;
+    console.log("pick " + ix + ", " +  iy);
     
+    const data = backCtx!.getImageData(ix, iy, 1, 1).data;
+    x= ix;
+    y= iy;
+    setImgPos({x, y});
     setRgba([data[0], data[1], data[2], data[3]]);
    // DrawCanvas();
   };
@@ -319,7 +329,7 @@ export default function SBComp()
     const p = toLocal(e);
     pick(e.clientX, e.clientY);
     //setPos(p);
-    updateOverlayPos();
+   // updateOverlayPos();
    // DrawCanvas();
   };
   const onEnter = (e: MouseEvent) => { setHover(true); pick(e.clientX, e.clientY); DrawCanvas(); };
@@ -345,13 +355,13 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
              // ctx.drawImage(backCanvas, 0, wfInsertPos+scrollY(), backCanvas.width, canvasRef.height, 0, 0, canvasRef.width, canvasRef.height);
              const zoom = 1.0; 
              ctx.drawImage(backCanvas, scrollX(), wfInsertPos+scrollY(), canvasRef.width/zoom, canvasRef.height/zoom, 0, 0, canvasRef.width, canvasRef.height);
-             // console.log(backCanvas.width + "," + canvasRef.height + ", " + canvasRef.width + ", " + canvasRef.height);
+              console.log("draw canvas");
             }
         }
 
          // Crosshair at mouse
     if (hover()) {
-      const { x, y } = pos();
+      const { x, y } = cliPos();
       const X = x;// * dpr(), 
       const Y = y;// * dpr();
       ctx.strokeStyle = "#ff2d3a99";
@@ -397,17 +407,17 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
       //  updateScroll(startTop + e.deltaY/10);
     };
 
-    function addSlarLine(slar:any)
-    {	
+function addSlarLine(slar:any) : number
+{	
 	if (!slar || !backCtx) {
-		return;
+		return -1;
 	}
 	
     if (!slar.data) {
-		return;
+		return -1;
 	}
     if (!slar.data.pixels) {
-		return;
+		return -1;
 	}
     console.log("length: ", slar.data.pixels);
 	
@@ -432,6 +442,7 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
 	}
 	backCtx.putImageData(img, 0, wfInsertPos);
     wfInsertPos--;
+    return 0;
     }
 
     function addLine() {
@@ -477,8 +488,9 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
           case "SDPStatusMessage":{
             const data = event.detail.data;
             //console.log("SDPStatusMessage");
-            addSlarLine(data.slar);
-            DrawCanvas();
+            
+            if(addSlarLine(data.slar) >= 0)
+              DrawCanvas();
             break;        
           }
         }
@@ -494,13 +506,39 @@ const toHex = (n:number) => n.toString(16).padStart(2,'0');
 return '#' + toHex(r) + toHex(b) + toHex(g);
 };
 
+function CenterAtVert(center:number)
+{
+  setScrollY(center);
+
+  const fac = center / (contentHeight()-divHeight());
+  const thumbHeight = Math.max((divHeight() / contentHeight()) * divHeight(), 30);
+  const maxTop = divHeight() - thumbHeight;
+  const top = fac * maxTop;
+  const clampedTop = Math.max(0, Math.min(top, maxTop));
+
+  console.log("new top: " + clampedTop);
+  setNewTop(clampedTop);    
+}
+
+function CenterAtHor(center:number)
+{
+  setScrollX(center);  
+   const fac = center / (contentWidth()-divWidth());
+    const thumbWidth = Math.max((divWidth() / contentWidth()) * divWidth(), 30);
+    const maxLeft = divWidth() - thumbWidth;
+    const left = fac * maxLeft;
+    const clampedTop = Math.max(0, Math.min(left, maxLeft));
+    
+    console.log("new top: " + clampedTop);
+    setNewLeft(clampedTop);        
+}
 
 const hexProper = () => {
 const [r,g,b] = rgba();
 const toHex = (n:number) => n.toString(16).padStart(2,'0');
 return '#' + toHex(r) + toHex(g) + toHex(b);
 };
-    let timerId:number=0;
+    //let timerId:number=0;
     onMount(() => {
         img.onload = () => {
             backCanvas.width = img.width;
@@ -509,9 +547,14 @@ return '#' + toHex(r) + toHex(g) + toHex(b);
 
             console.log("Image loaded via event.");
             setContentHeight(img.height);  
-            setContentWidth(img.width);            
+            setContentWidth(img.width);      
+
+            CenterAtVert(10);
+            CenterAtHor(img.width/2-divWidth()/2);
+            
+            //setNewLeft();  
             DrawCanvas();
-           
+            
             /*if(timerId ==0 )
             {
                 timerId = setInterval(() => {
@@ -562,25 +605,6 @@ return '#' + toHex(r) + toHex(g) + toHex(b);
         />
    
   
-  <div
-  
-        ref={el => (overlay = el)}
-        style={{
-          position: "fixed",
-          left: `${ovPos().left}px`,
-          top: `${ovPos().top}px`,"font-family": "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-          "font-size": "12px",
-          color: "#e5e7eb",
-          background: "rgba(17,19,24,.5)",
-          padding: "4px 6px",
-          "border-radius": "4px",
-          "pointer-events": "none",
-          "user-select": "none",
-          opacity: hover() ? 1 : 0.2
-        }}
-      >
-        {Math.round(pos().x)}, {Math.round(pos().y)}
-      </div>
       
        
       </div>
@@ -596,7 +620,7 @@ return '#' + toHex(r) + toHex(g) + toHex(b);
         newLeft={newLeft()}
         wndWidth={divWidth()}
         contentWidth={contentWidth()}
-        onScroll={(x) => setScrollX(x)}
+        onScroll={(x) =>{ setScrollX(x);console.log("set!!: " + x)}}
         />
         
  <div style={{
@@ -606,7 +630,7 @@ background: 'rgba(0,0,0,0.55)', color: '#e5e7eb', 'font-family': 'ui-monospace, 
 }}>
 <div style={{ display: 'flex', 'align-items': 'center', gap: '8px' }}>
 <span style={{ display: 'inline-block', width: '14px', height: '14px', 'border-radius': '3px', background: hexProper(), border: '1px solid rgba(255,255,255,0.2)' }} />
-<span>{(() => { const {x,y}=pos(); const [r,g,b,a]=rgba(); return `(${Math.round(x)}, ${Math.round(y)}) ${hexProper()} rgba(${r},${g},${b},${a})`; })()}</span>
+<span>{(() => { const {x,y}=imgPos(); const [r,g,b,a]=rgba(); return `(${Math.round(x)}, ${Math.round(y)}) ${hexProper()} rgba(${r},${g},${b},${a})`; })()}</span>
 </div></div>
       </>
     );
