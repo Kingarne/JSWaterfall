@@ -22,14 +22,14 @@ export function Scrollbar(props: ScrollbarProps) {
     const clampedTop = Math.max(0, Math.min(top, maxTop));
     setThumbTop(clampedTop);
     const scrollY = (clampedTop / maxTop) * (props.contentHeight - props.wndHeight);
-    console.log("updateScroll:", top, scrollY);
+    console.log("updateScrollY:", top, scrollY);
     props.onScroll(scrollY);
   };
 
  createEffect(()=> {
     //thumbRef!.innerText = props.newTop.toString();
     thumbRef!.innerText = thumbTop().toString();
-    console.log("Height: " + props.wndHeight);
+    //console.log("Height: " + props.wndHeight);
     //setThumbTop(props.newTop);
  })
 
@@ -38,16 +38,16 @@ export function Scrollbar(props: ScrollbarProps) {
     //thumbRef!.innerText = thumbTop().toString();
     setThumbTop(props.newTop);
     //updateScroll(props.newTop);
-    console.log("contentHeight: " + props.contentHeight);
+    //console.log("contentHeight: " + props.contentHeight);
  })
 
 createEffect(()=> {
    
-    console.log("newTop: " + props.newTop);
+    //console.log("newTop: " + props.newTop);
  })
 
   const handleWheel = (e: WheelEvent) => {
-        console.log("wheel:", thumbRef.offsetTop, ", ", e.deltaY);
+       // console.log("wheel:", thumbRef.offsetTop, ", ", e.deltaY);
         const startTop = thumbRef.offsetTop;
         updateScroll(startTop + e.deltaY/10);
     };
@@ -57,7 +57,7 @@ createEffect(()=> {
     const startY = e.clientY;
     const startTop = thumbRef.offsetTop;
 
-    console.log("MouseDown:", e.clientY, ", ", startTop);
+   // console.log("MouseDown:", e.clientY, ", ", startTop);
 
     const onMouseMove = (e: MouseEvent) => {
       if (!dragging()) return;
@@ -134,7 +134,7 @@ export function ScrollbarH(props: ScrollbarHProps) {
     const clampedLeft = Math.max(0, Math.min(left, maxLeft));
     setThumbLeft(clampedLeft);
     const scrollX = (clampedLeft / maxLeft) * (props.contentWidth - props.wndWidth);
-    console.log("updateScrollX:", left, scrollX);
+   // console.log("updateScrollX:", left, scrollX);
     props.onScroll(scrollX);
   };
 
@@ -150,16 +150,16 @@ export function ScrollbarH(props: ScrollbarHProps) {
     //thumbRef!.innerText = thumbTop().toString();
     setThumbLeft(props.newLeft);
     //updateScroll(props.newTop);
-    console.log("contentHeight: " + props.contentWidth);
+   // console.log("contentHeight: " + props.contentWidth);
  })
 
 createEffect(()=> {
    
-    console.log("newTop: " + props.newLeft);
+    //console.log("newTop: " + props.newLeft);
  })
 
   const handleWheel = (e: WheelEvent) => {
-        console.log("wheelH:", thumbRef.offsetLeft, ", ", e.deltaY);
+      //  console.log("wheelH:", thumbRef.offsetLeft, ", ", e.deltaY);
         const startLeft = thumbRef.offsetLeft;
         updateScroll(startLeft - e.deltaY/10);
     };
@@ -238,6 +238,7 @@ export default function SBComp()
     let overlay!: HTMLDivElement;
     let ro: ResizeObserver | undefined;
 
+    const [zoom, setZoom] = createSignal(1.0);
     const [newTop, setNewTop] = createSignal(0);
     const [newLeft, setNewLeft] = createSignal(0);
     const [scrollY, setScrollY] = createSignal(0);
@@ -315,7 +316,7 @@ export default function SBComp()
     const iy = scrY + Math.min(canvasRef.height - 1, Math.max(0, Math.floor(y * dpr())));
     //const ctx = canvasRef.getContext("2d", { willReadFrequently: true });
     //const data = ctx!.getImageData(0, 0, 1, 1).data;
-    console.log("pick " + ix + ", " +  iy);
+   // console.log("pick " + ix + ", " +  iy);
     
     const data = backCtx!.getImageData(ix, iy, 1, 1).data;
     x= ix;
@@ -353,9 +354,9 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
             if (img.naturalWidth !== 0) {
               //console.log("Image is already loaded.");
              // ctx.drawImage(backCanvas, 0, wfInsertPos+scrollY(), backCanvas.width, canvasRef.height, 0, 0, canvasRef.width, canvasRef.height);
-             const zoom = 1.0; 
-             ctx.drawImage(backCanvas, scrollX(), wfInsertPos+scrollY(), canvasRef.width/zoom, canvasRef.height/zoom, 0, 0, canvasRef.width, canvasRef.height);
-              console.log("draw canvas");
+          //   const zoom = 1.0; 
+             ctx.drawImage(backCanvas, scrollX()/zoom(), wfInsertPos+scrollY()/zoom(), canvasRef.width/zoom(), canvasRef.height/zoom(), 0, 0, canvasRef.width, canvasRef.height);
+            //  console.log("draw canvas");
             }
         }
 
@@ -384,13 +385,43 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
 
     const handleWheel = (e: WheelEvent) => {       
         //scRef!.innerText = "hej";
-        console.log("canvas wheel bef: " + scrollY());
-        let y = scrollY() + e.deltaY/2;
+//        console.log("canvas wheel bef: " + scrollY());
+       
+      if (e.ctrlKey) {  
+        e.preventDefault();
+       
+        console.log("D: " + e.deltaY);
+        
+        let newz = zoom() + (e.deltaY > 0 ? -0.1: 0.1);
+        
+        setZoom(newz);
+        setContentHeight(backCanvas.height*zoom());
+        setContentWidth(backCanvas.width*zoom());
+        CenterAtVert(scrollY()/zoom());
+        CenterAtHor(scrollX()/zoom());
+        console.log("newz: " + newz + ", " + backCanvas.height*zoom());
+
+        return;
+      }
+
+      if (!e.shiftKey) {  
+        let y = scrollY() + e.deltaY/2;                      
         console.log("canvas wheel: " + y);
         const maxY = contentHeight()-divHeight();
         const clampedY = Math.max(0, Math.min(y, maxY));
+        CenterAtVert(clampedY);
+      }
+      else
+      {
+       
+        let x = scrollX() + e.deltaY/2;
+      //  console.log("canvas wheel: " + x);
+        const maxX = contentWidth()-divWidth();
+        const clampedX = Math.max(0, Math.min(x, maxX));
+        CenterAtHor(clampedX);
+      }
 
-        setScrollY(clampedY);
+      /*setScrollY(clampedY);
 
         const fac = y / (contentHeight()-divHeight());
         const thumbHeight = Math.max((divHeight() / contentHeight()) * divHeight(), 30);
@@ -399,7 +430,7 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
         const clampedTop = Math.max(0, Math.min(top, maxTop));
         
         console.log("new top: " + clampedTop);
-        setNewTop(clampedTop);        
+        setNewTop(clampedTop);        */
         //const scrollY = (clampedTop / maxTop) * (props.contentHeight - props.wndHeight);
 
        // 
@@ -445,29 +476,7 @@ function addSlarLine(slar:any) : number
     return 0;
     }
 
-    function addLine() {
-       
-        if(backCtx == null)
-            return;
-
-        const imageData = backCtx.createImageData(backCanvas.width, 1);
-        for (let x = 0; x < backCanvas.width; x++) {
-            const value = x%255;//Math.floor((x / (backCanvas.width - 1)) * 255); // Ramp from 0 to 255
-        
-            // Set pixel at position x
-            const index = x * 4;
-            imageData.data[index] = value;      // Red
-            imageData.data[index + 1] = value;  // Green
-            imageData.data[index + 2] = value;  // Blue
-            imageData.data[index + 3] = 255;    // Alpha (fully opaque)
-          }
-        if(wfInsertPos < 0)
-            GrowCanvas(10);    
-        // Put the image data back into the canvas
-        backCtx.putImageData(imageData, 0, wfInsertPos);
-        wfInsertPos--;
-    }
-
+   
     function GrowCanvas(grow:number)
     {
         console.log("GrowCanvas: ", grow);
@@ -508,6 +517,7 @@ return '#' + toHex(r) + toHex(b) + toHex(g);
 
 function CenterAtVert(center:number)
 {
+  console.log("centerY: " + center + "cH: " + contentHeight());
   setScrollY(center);
 
   const fac = center / (contentHeight()-divHeight());
@@ -516,7 +526,7 @@ function CenterAtVert(center:number)
   const top = fac * maxTop;
   const clampedTop = Math.max(0, Math.min(top, maxTop));
 
-  console.log("new top: " + clampedTop);
+  console.log("New top: " + clampedTop + ", " + maxTop);
   setNewTop(clampedTop);    
 }
 
@@ -529,7 +539,7 @@ function CenterAtHor(center:number)
     const left = fac * maxLeft;
     const clampedTop = Math.max(0, Math.min(left, maxLeft));
     
-    console.log("new top: " + clampedTop);
+    //console.log("new top: " + clampedTop);
     setNewLeft(clampedTop);        
 }
 
@@ -549,7 +559,7 @@ return '#' + toHex(r) + toHex(g) + toHex(b);
             setContentHeight(img.height);  
             setContentWidth(img.width);      
 
-            CenterAtVert(10);
+            CenterAtVert(0);
             CenterAtHor(img.width/2-divWidth()/2);
             
             //setNewLeft();  
@@ -620,7 +630,7 @@ return '#' + toHex(r) + toHex(g) + toHex(b);
         newLeft={newLeft()}
         wndWidth={divWidth()}
         contentWidth={contentWidth()}
-        onScroll={(x) =>{ setScrollX(x);console.log("set!!: " + x)}}
+        onScroll={(x) =>{ setScrollX(x);}}
         />
         
  <div style={{
