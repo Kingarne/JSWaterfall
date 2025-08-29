@@ -140,7 +140,7 @@ export function ScrollbarH(props: ScrollbarHProps) {
 
  createEffect(()=> {
     //thumbRef!.innerText = props.newTop.toString();
- //   thumbRef!.innerText = thumbLeft().toString();
+    thumbRef!.innerText = thumbLeft().toString();
   //  console.log("width: " + props.wndWidth);
     //setThumbTop(props.newTop);
  })
@@ -259,7 +259,7 @@ export default function SBComp()
   };
 
 
-    const imgBmp = new URL('../assets/SLAR.bmp', import.meta.url).href
+    const imgBmp = new URL('../assets/SLAR-mark.bmp', import.meta.url).href
     //const imgBmp = new URL('../assets/SLAR-large.bmp', import.meta.url).href
     const img = new Image();
     // Optionally handle cross-origin images (if needed).
@@ -292,39 +292,58 @@ export default function SBComp()
     return { x: (e.clientX - r.left), y: (e.clientY - r.top) };
   };
 
+
+
+  const img2Cli = (imgX: number, imgY: number) => {
+  if (!canvasRef)
+    return { x: 0, y: 0 };
+
+  // image → device pixels inside the canvas
+  // (apply zoom, then remove scroll)
+  let dx = imgX * zoom() - scrollX();
+  let dy = imgY * zoom() - scrollY();
+
+  // clamp to the canvas backing-store (device px)
+  dx = Math.min(canvasRef.width - 1, Math.max(0, Math.floor(dx)));
+  dy = Math.min(canvasRef.height - 1, Math.max(0, Math.floor(dy)));
+
+  // device px → client (CSS) px
+  const cliX = dx / dpr();
+  const cliY = dy / dpr();
+
+  return { x: cliX, y: cliY };
+};
+  
+  const cli2Img = (cliX: number, cliY: number) => {
+    if(!canvasRef)
+      return { x: (0), y: (0) };
+
+    let ix = scrollX() + Math.min(canvasRef.width - 1, Math.max(0, Math.floor(cliX * dpr())));
+    let iy = scrollY() + Math.min(canvasRef.height - 1, Math.max(0, Math.floor(cliY * dpr())));
+
+    ix = ix/zoom();
+    iy = iy/zoom();
+    
+  //console.log("p:" + ix + "," + iy);
+
+    return { x: (ix), y: (iy) };
+  
+  }
+
+
   const pick = (clientX: number, clientY: number) => {
     if(!canvasRef)
       return;
 
-    let scrX = scrollX();
-    let scrY = scrollY();
-
-    const rect = canvasRef.getBoundingClientRect();
-    let x = clientX;// - rect.left ;
-    let y = clientY;// - rect.top;
-    setCliPos({ x, y });
-    //x= x+scrX;
-    //y= y+scrY;
-    
-
-    const xf =backCanvas.width / canvasRef.width;
-    
-    
-    //const xb = x*xf;
-    
-    const ix = scrX + Math.min(canvasRef.width - 1, Math.max(0, Math.floor(x * dpr())));
-    const iy = scrY + Math.min(canvasRef.height - 1, Math.max(0, Math.floor(y * dpr())));
-    //const ctx = canvasRef.getContext("2d", { willReadFrequently: true });
-    //const data = ctx!.getImageData(0, 0, 1, 1).data;
-   // console.log("pick " + ix + ", " +  iy);
-    
-    const data = backCtx!.getImageData(ix, iy, 1, 1).data;
-    x= ix;
-    y= iy;
-    setImgPos({x, y});
+    const p = cli2Img(clientX, clientY);
+    setCliPos({x:clientX, y:clientY});
+   
+    const data = backCtx!.getImageData(p.x, p.y, 1, 1).data;
+    setImgPos({x:p.x, y:p.y});
     setRgba([data[0], data[1], data[2], data[3]]);
-   // DrawCanvas();
+
   };
+
   // --- Event listeners on the <canvas> ---
   const onMove = (e: MouseEvent) => {
     const p = toLocal(e);
@@ -390,15 +409,15 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
       if (e.ctrlKey) {  
         e.preventDefault();
        
-        console.log("D: " + e.deltaY);
-        
-        let newz = zoom() + (e.deltaY > 0 ? -0.1: 0.1);
-        
+        //console.log("D: " + e.deltaY);        
+        let newz = zoom() + (e.deltaY > 0 ? -0.1: 0.1);        
+        if(newz< 0.4)
+          return;
         setZoom(newz);
         setContentHeight(backCanvas.height*zoom());
         setContentWidth(backCanvas.width*zoom());
-        CenterAtVert(scrollY()/zoom());
-        CenterAtHor(scrollX()/zoom());
+        CenterAtVert(scrollY());///zoom());
+        CenterAtHor(scrollX());///zoom());
         console.log("newz: " + newz + ", " + backCanvas.height*zoom());
 
         return;
@@ -428,7 +447,7 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
         const maxTop = divHeight() - thumbHeight;
         const top = fac * maxTop;
         const clampedTop = Math.max(0, Math.min(top, maxTop));
-        
+
         console.log("new top: " + clampedTop);
         setNewTop(clampedTop);        */
         //const scrollY = (clampedTop / maxTop) * (props.contentHeight - props.wndHeight);
@@ -526,7 +545,7 @@ function CenterAtVert(center:number)
   const top = fac * maxTop;
   const clampedTop = Math.max(0, Math.min(top, maxTop));
 
-  console.log("New top: " + clampedTop + ", " + maxTop);
+  //console.log("New top: " + clampedTop + ", " + maxTop);
   setNewTop(clampedTop);    
 }
 
