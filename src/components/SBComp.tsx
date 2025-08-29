@@ -352,6 +352,13 @@ export default function SBComp()
    // updateOverlayPos();
    // DrawCanvas();
   };
+  const onMouseDown = (e: MouseEvent) => {
+     //CenterAtImgVert( imgPos().y);
+     CenterAtImg(imgPos().x, imgPos().y);
+     
+    console.log("down:", imgPos().y)
+  };
+  
   const onEnter = (e: MouseEvent) => { setHover(true); pick(e.clientX, e.clientY); DrawCanvas(); };
   const onLeave = () => { setHover(false); DrawCanvas(); };
 const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
@@ -362,8 +369,8 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
 
         const ctx = canvasRef.getContext("2d", { willReadFrequently: true });
         if (!ctx) return;
-      //  ctx.fillStyle = "#f0f0f0";
-      //  ctx.fillRect(0, 0, canvasRef.width, canvasRef.height);
+        ctx.fillStyle = "#93b0f1";
+        ctx.fillRect(0, 0, canvasRef.width, canvasRef.height);
 
        // ctx.fillStyle = "#8080fb";
        // ctx.fillRect(0, scrollY(), canvasRef.width, viewHeight());
@@ -380,7 +387,7 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
         }
 
          // Crosshair at mouse
-    if (hover()) {
+    if (0){//hover()) {
       const { x, y } = cliPos();
       const X = x;// * dpr(), 
       const Y = y;// * dpr();
@@ -410,14 +417,17 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
         e.preventDefault();
        
         //console.log("D: " + e.deltaY);        
-        let newz = zoom() + (e.deltaY > 0 ? -0.1: 0.1);        
-        if(newz< 0.4)
+        let newz = zoom() * (e.deltaY > 0 ? 0.9: 1.1);        
+        if(newz< 0.2)
           return;
+
+        console.log(imgPos().x, imgPos().y);
+
         setZoom(newz);
         setContentHeight(backCanvas.height*zoom());
         setContentWidth(backCanvas.width*zoom());
-        CenterAtVert(scrollY());///zoom());
-        CenterAtHor(scrollX());///zoom());
+        CenterAtImg( imgPos().x, imgPos().y);///zoom());
+        //CenterAtHor(scrollX());///zoom());
         console.log("newz: " + newz + ", " + backCanvas.height*zoom());
 
         return;
@@ -534,6 +544,55 @@ const toHex = (n:number) => n.toString(16).padStart(2,'0');
 return '#' + toHex(r) + toHex(b) + toHex(g);
 };
 
+
+function CenterAtImg(cx:number, cy:number)
+{
+  CenterAtImgVert(cy);
+  CenterAtImgHor(cx);
+}
+
+function CenterAtImgVert(cy:number)
+{
+  console.log("centerY: " + cy + "cH: " + contentHeight());
+  const maxY = contentHeight()-divHeight();
+
+  
+  const newC = cy*zoom()-(divHeight()/2);
+  const clampedY = Math.max(0, Math.min(newC, maxY));
+  console.log("newC: " + clampedY);
+  setScrollY(clampedY);
+
+  const fac = clampedY / (contentHeight()-divHeight());
+  const thumbHeight = Math.max((divHeight() / contentHeight()) * divHeight(), 30);
+  const maxTop = divHeight() - thumbHeight;
+  const top = fac * maxTop;
+  const clampedTop = Math.max(0, Math.min(top, maxTop));
+
+  //console.log("New top: " + clampedTop + ", " + maxTop);
+  setNewTop(clampedTop);    
+}
+
+function CenterAtImgHor(cx:number)
+{
+  console.log("centerY: " + cx + "cH: " + contentHeight());
+  const maxX = contentWidth()-divWidth();
+  
+  const newC = cx*zoom()-(divWidth()/2);
+  const clampedX = Math.max(0, Math.min(newC, maxX));
+  console.log("newC: " + clampedX);
+  setScrollX(clampedX);
+
+  const fac = clampedX / (contentWidth()-divWidth());
+  const thumbWidth = Math.max((divWidth() / contentWidth()) * divWidth(), 30);
+  const maxLeft = divWidth() - thumbWidth;
+  const left = fac * maxLeft;
+  const clampedLeft = Math.max(0, Math.min(left, maxLeft));
+
+  //console.log("New top: " + clampedTop + ", " + maxTop);
+  setNewLeft(clampedLeft);    
+}
+
+
 function CenterAtVert(center:number)
 {
   console.log("centerY: " + center + "cH: " + contentHeight());
@@ -563,9 +622,9 @@ function CenterAtHor(center:number)
 }
 
 const hexProper = () => {
-const [r,g,b] = rgba();
-const toHex = (n:number) => n.toString(16).padStart(2,'0');
-return '#' + toHex(r) + toHex(g) + toHex(b);
+  const [r,g,b] = rgba();
+  const toHex = (n:number) => n.toString(16).padStart(2,'0');
+  return '#' + toHex(r) + toHex(g) + toHex(b);
 };
     //let timerId:number=0;
     onMount(() => {
@@ -597,6 +656,7 @@ return '#' + toHex(r) + toHex(g) + toHex(b);
           if(canvasRef)
           {         
             canvasRef.addEventListener("mousemove", onMove);
+            canvasRef.addEventListener("mousedown", onMouseDown);
             canvasRef.addEventListener("mouseenter", onEnter);
             canvasRef.addEventListener("mouseleave", onLeave);
           }
