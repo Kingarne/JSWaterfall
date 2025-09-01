@@ -33,6 +33,8 @@ const App: Component = () => {
 
   onMount(() => {
     sdpSocket.addEventListener("message", onSDPMessage);
+
+    
   });
 
   

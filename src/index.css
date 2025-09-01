@@ -110,5 +110,5 @@ body {
   position: absolute;
   left:0;
   background-color: #68686892;
-  visibility: hidden;
+ /* visibility: hidden;*/
 }

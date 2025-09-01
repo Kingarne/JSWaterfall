@@ -1,5 +1,6 @@
 import { createSignal, onMount, onCleanup, createEffect, JSX, Accessor } from "solid-js";
 import { MSSEvent } from '../events';
+import InfoView from "./InfoView";
 
 interface ScrollbarProps {
   newTop:number;
@@ -227,13 +228,15 @@ return (
 );
 }
 
-
+type RGBA = [number, number, number, number];
+type Point = { x: number; y: number };
 
 export default function SBComp() 
 {
     let divRef: HTMLDivElement | undefined;        
     let scRef: HTMLDivElement;        
     let scHRef: HTMLDivElement;        
+    let infoV: HTMLDivElement;        
     let canvasRef: HTMLCanvasElement;
     let overlay!: HTMLDivElement;
     let ro: ResizeObserver | undefined;
@@ -247,10 +250,15 @@ export default function SBComp()
     const [contentHeight, setContentHeight] = createSignal(800);
     const [divWidth, setDivWidth] = createSignal(600);
     const [contentWidth, setContentWidth] = createSignal(800);
-    const [imgPos, setImgPos] = createSignal({ x: 0, y: 0 });
+    const [imgPos, setImgPos] = createSignal<Point>({ x: 0, y: 0 });
     const [cliPos, setCliPos] = createSignal({ x: 0, y: 0 });
     const [hover, setHover] = createSignal(false);    
-    const [rgba, setRgba] = createSignal<[number,number,number,number]>([0,0,0,255]);
+    const [rgba, setRgba] = createSignal<RGBA>([0,0,0,255]);
+
+    const css = () => {
+    const [r, g, b, a] = rgba();
+    return `rgba(${r}, ${g}, ${b}, ${a / 255})`;
+  };
 
   const updateOverlayPos = () => {
     if (!canvasRef) return;
@@ -367,6 +375,7 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
         if(!canvasRef)
             return;
 
+        //console.log("DrawCanvas");
         const ctx = canvasRef.getContext("2d", { willReadFrequently: true });
         if (!ctx) return;
         ctx.fillStyle = "#93b0f1";
@@ -374,20 +383,21 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
 
        // ctx.fillStyle = "#8080fb";
        // ctx.fillRect(0, scrollY(), canvasRef.width, viewHeight());
-
+        let scrX = scrollX();
+        let scrY = scrollY();
         if (img.complete && backCtx ) {
             // Sometimes, an image marked as complete may not have loaded correctly.
             if (img.naturalWidth !== 0) {
               //console.log("Image is already loaded.");
              // ctx.drawImage(backCanvas, 0, wfInsertPos+scrollY(), backCanvas.width, canvasRef.height, 0, 0, canvasRef.width, canvasRef.height);
           //   const zoom = 1.0; 
-             ctx.drawImage(backCanvas, scrollX()/zoom(), wfInsertPos+scrollY()/zoom(), canvasRef.width/zoom(), canvasRef.height/zoom(), 0, 0, canvasRef.width, canvasRef.height);
+             ctx.drawImage(backCanvas, scrX/zoom(), wfInsertPos+scrY/zoom(), canvasRef.width/zoom(), canvasRef.height/zoom(), 0, 0, canvasRef.width, canvasRef.height);
             //  console.log("draw canvas");
             }
         }
 
          // Crosshair at mouse
-    if (0){//hover()) {
+    /*if (hover()) {
       const { x, y } = cliPos();
       const X = x;// * dpr(), 
       const Y = y;// * dpr();
@@ -397,14 +407,14 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
       ctx.beginPath(); ctx.moveTo(X, 0); ctx.lineTo(X, canvasRef.height); ctx.stroke();
 
       ctx.fillStyle = "#4f46e5"; // dot
-      ctx.beginPath(); ctx.arc(X, Y, 5 /* dpr()*/, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(X, Y, 5 * dpr(), 0, Math.PI * 2); ctx.fill();
 
       // Position label
       ctx.fillStyle = "#e5e7eb";
       ctx.font = `${12 * dpr()}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
       const label = `(${Math.round(x)}, ${Math.round(y)})`;
       ctx.fillText(label, X + 8 * dpr(), Y - 8 * dpr());
-    }
+    }*/
       
       
     }
@@ -670,10 +680,10 @@ const hexProper = () => {
     });
   
     createEffect(() => {
-      if (canvasRef) {
+     // if (canvasRef) {
         DrawCanvas();
         // canvasRef.style.transform = `translateY(-${scrollY()}px)`;
-      }
+     // }
     });
   
     //<div style={{ display: "flex", width: "812px" }}></div>
@@ -712,17 +722,28 @@ const hexProper = () => {
         onScroll={(x) =>{ setScrollX(x);}}
         />
         
- <div style={{
-position: 'absolute', left: '8px', top: '30px', padding: '6px 8px', 'border-radius': '8px',
-background: 'rgba(0,0,0,0.55)', color: '#e5e7eb', 'font-family': 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-'font-size': '12px', 'pointer-events': 'none'
-}}>
-<div style={{ display: 'flex', 'align-items': 'center', gap: '8px' }}>
-<span style={{ display: 'inline-block', width: '14px', height: '14px', 'border-radius': '3px', background: hexProper(), border: '1px solid rgba(255,255,255,0.2)' }} />
-<span>{(() => { const {x,y}=imgPos(); const [r,g,b,a]=rgba(); return `(${Math.round(x)}, ${Math.round(y)}) ${hexProper()} rgba(${r},${g},${b},${a})`; })()}</span>
-</div></div>
+        <InfoView
+          ref={infoV!}
+          rgba={rgba()}
+          p={imgPos()}
+          //rgba = {rgba()}
+        //  text = "hej2"
+        />
+
+    
       </>
     );
   }
 
-  
+/*
+  <div style={{
+        position: 'absolute', left: '8px', top: '30px', padding: '6px 8px', 'border-radius': '8px',
+        background: 'rgba(0,0,0,0.55)', color: '#e5e7eb', 'font-family': 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+        'font-size': '12px', 'pointer-events': 'none'
+        }}>
+        <div style={{ display: 'flex', 'align-items': 'center', gap: '8px' }}>
+        <span style={{ display: 'inline-block', width: '14px', height: '14px', 'border-radius': '3px', background: hexProper(), border: '1px solid rgba(255,255,255,0.2)' }} />
+        <span>{(() => { const {x,y}=imgPos(); const [r,g,b,a]=rgba(); return `(${Math.round(x)}, ${Math.round(y)}) ${hexProper()} rgba(${r},${g},${b},${a})`; })()}</span>
+        </div>
+      </div>
+  */
