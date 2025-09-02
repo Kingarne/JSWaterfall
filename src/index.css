@@ -106,6 +106,10 @@ body {
   
 }
 
+.lens{       
+    border-radius: 9999px;
+}
+
 .info{
   position: absolute;
   left:0;

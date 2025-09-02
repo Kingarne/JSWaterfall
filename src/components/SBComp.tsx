@@ -250,7 +250,7 @@ export default function SBComp()
     let overlay!: HTMLDivElement;
     let ro: ResizeObserver | undefined;
 
-    const props:ZoomLensProps = {src:"", width:50, height:50, zoom:3.0, lensSize:250, round:true};
+    const props:ZoomLensProps = {src:"", width:50, height:50, zoom:3.0, lensSize:300, round:true};
     const lensSize = props.lensSize ?? 250;
     const makeRound = props.round ?? true;
 
@@ -286,7 +286,7 @@ export default function SBComp()
 
 
     const imgBmp = new URL('../assets/SLAR-mark.bmp', import.meta.url).href
-    //const imgBmp = new URL('../assets/SLAR-large.bmp', import.meta.url).href
+   // const imgBmp = new URL('../assets/SLAR-large.bmp', import.meta.url).href
     const img = new Image();
     // Optionally handle cross-origin images (if needed).
     // img.crossOrigin = "anonymous";
@@ -802,27 +802,34 @@ const hexProper = () => {
   
   const lensStyle: Partial<CSSStyleDeclaration> = {
     position: "fixed",                 // follows the page cursor
-    left: "10px",
-    top: "10px",
+    left: "0px",
+    top: "0px",
     width: `${lensSize}px`,
     height: `${lensSize}px`,
     pointerEvents: "none",             // let mouse pass through
-    opacity: "50%",                      // hidden until 'm' is held
+    opacity: "0%",                      // hidden until 'm' is held
     transition: "opacity 80ms linear",
-    border: "1px solid rgba(255,255,255,.3)",
+    border: "2px solid rgba(255,255,255,.3)",
     boxShadow: "0 6px 20px rgba(0,0,0,.35)",
-    borderRadius: "100px",
+    borderRadius: "9999px",
     overflow: "hidden",
     background: "#000",
     zIndex: "9999",
   };
+  const lensCanvStyle: Partial<CSSStyleDeclaration> = {   
+    pointerEvents: "none",             // let mouse pass through
+ //   opacity: "50%",                      // hidden until 'm' is held
+    transition: "opacity 80ms linear",
+    borderRadius: "100px",    
+  };
+
 
     return (
       <>
       <div class="wfSB" id="contSBArea" ref={divRef} onWheel={handleWheel}>
         <canvas class="testCanv" ref={canvasRef!}/>
-        <div ref={lensDiv} style={lensStyle}>
-            <canvas ref={lensCanvas} />
+        <div class="lens" ref={lensDiv} style={lensStyle}>
+            <canvas ref={lensCanvas}  style={lensCanvStyle}/>
           </div>
   
       
