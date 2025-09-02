@@ -231,6 +231,15 @@ return (
 type RGBA = [number, number, number, number];
 type Point = { x: number; y: number };
 
+type ZoomLensProps = {
+  src: string;        // image URL
+  width: number;      // main canvas CSS width (px)
+  height: number;     // main canvas CSS height (px)
+  zoom?: number;      // magnification factor (e.g. 3 = 3x)
+  lensSize?: number;  // lens box size in CSS px (square)
+  round?: boolean;    // make lens circular
+};
+
 export default function SBComp() 
 {
     let divRef: HTMLDivElement | undefined;        
@@ -240,6 +249,14 @@ export default function SBComp()
     let canvasRef: HTMLCanvasElement;
     let overlay!: HTMLDivElement;
     let ro: ResizeObserver | undefined;
+
+    const props:ZoomLensProps = {src:"", width:50, height:50, zoom:3.0, lensSize:250, round:true};
+    const lensSize = props.lensSize ?? 250;
+    const makeRound = props.round ?? true;
+
+    let lensCanvas!: HTMLCanvasElement; // canvas inside the lens
+    let lensDiv!: HTMLDivElement;       // floating lens container
+    let lensCtx!: CanvasRenderingContext2D;
 
     const [zoom, setZoom] = createSignal(1.0);
     const [newTop, setNewTop] = createSignal(0);
@@ -254,6 +271,7 @@ export default function SBComp()
     const [cliPos, setCliPos] = createSignal({ x: 0, y: 0 });
     const [hover, setHover] = createSignal(false);    
     const [rgba, setRgba] = createSignal<RGBA>([0,0,0,255]);
+    const [zHeld, setZHeld] = createSignal(false);
 
     const css = () => {
     const [r, g, b, a] = rgba();
@@ -275,7 +293,7 @@ export default function SBComp()
     img.src = imgBmp;
     
     let backCanvas = document.createElement('canvas');
-    let backCtx = backCanvas.getContext('2d', { willReadFrequently: true } );    
+    let backCtx = backCanvas.getContext('2d', { willReadFrequently: true } );     
     let wfInsertPos:number=-1;
 
     //const canvasHeight = 1200;
@@ -352,22 +370,113 @@ export default function SBComp()
 
   };
 
+function drawLensAt(clientX: number, clientY: number) {
+    if (!zHeld()) return;
+
+    // Position lens near the cursor
+    const pad = 5; // offset from cursor
+    let left = clientX + pad;
+    let top = clientY + pad;
+
+    // Keep lens within viewport if it would spill off-screen
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    if (left + lensSize > vw) left = clientX - lensSize - pad;
+    if (top + lensSize > vh) top = clientY - lensSize - pad;
+
+    console.log("cli: " + clientX + ", " + clientY);
+    //lensDiv.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+    lensDiv.style.transform = `translate3d(${clientX}px, ${clientY}px, 0)`;
+
+    lensCtx.clearRect(0, 0, lensSize, lensSize);
+
+ // Source rect in image px: make it lensSize/zoom, centered on (ix, iy)
+    let ix = imgPos().x;
+    let iy = imgPos().y;
+
+    const srcW = lensSize / (zoom()*4);//props.zoom!;
+    const srcH = lensSize / (zoom()*4);//props.zoom!;
+    let sx = ix - srcW / 2;
+    let sy = iy - srcH / 2;
+
+    let width:number = backCanvas.width;
+    let height:number = backCanvas.height;
+    // Clamp to image bounds so the lens is always filled
+    if (sx < 0) sx = 0;
+    if (sy < 0) sy = 0;
+    if (sx + srcW > width) sx = width - srcW;
+    if (sy + srcH > height) sy = height - srcH;
+
+    //lensCtx.imageSmoothingEnabled = true;
+    //(lensCtx as any).imageSmoothingQuality = "high";
+    // Draw from offscreen original -> lens canvas (scaled to fill)
+   // lensCtx.save();
+    lensCtx.imageSmoothingEnabled = false;
+
+    lensCtx.drawImage(backCanvas, sx, sy, srcW, srcH, 0, 0, lensSize, lensSize);
+   // lensCtx.restore();
+    // Optional crosshair
+    lensCtx.strokeStyle = "rgba(219, 43, 43, 0.6)";
+    lensCtx.lineWidth = 1;
+    lensCtx.beginPath();
+    lensCtx.moveTo(lensSize / 2, 0);
+    lensCtx.lineTo(lensSize / 2, lensSize);
+    lensCtx.moveTo(0, lensSize / 2);
+    lensCtx.lineTo(lensSize, lensSize / 2);
+    lensCtx.stroke();
+}
+
   // --- Event listeners on the <canvas> ---
   const onMove = (e: MouseEvent) => {
     const p = toLocal(e);
     pick(e.clientX, e.clientY);
+    
+    if (hover() && zHeld()) {
+        lensDiv.style.opacity = "1";
+        drawLensAt(e.clientX, e.clientY);
+      }
     //setPos(p);
    // updateOverlayPos();
    // DrawCanvas();
   };
   const onMouseDown = (e: MouseEvent) => {
      //CenterAtImgVert( imgPos().y);
-     CenterAtImg(imgPos().x, imgPos().y);
-     
+     CenterAtImg(imgPos().x, imgPos().y);     
+
     console.log("down:", imgPos().y)
   };
   
-  const onEnter = (e: MouseEvent) => { setHover(true); pick(e.clientX, e.clientY); DrawCanvas(); };
+  const onEnter = (e: MouseEvent) => { 
+    console.log("onEnter");
+    setHover(true); 
+    if (zHeld()) lensDiv.style.opacity = "1";  
+    pick(e.clientX, e.clientY); 
+    DrawCanvas(); 
+  };
+
+   // Hold 'm' to show lens
+    const onKeyDown = (e: KeyboardEvent) => {
+      
+      if (e.key.toLowerCase() === "z") {
+        if (!zHeld()) {
+          setZHeld(true);        
+          if (hover()) {
+            console.log("onKeyDown");
+            lensDiv.style.opacity = "1";
+            const m = cliPos();
+            drawLensAt(m.x, m.y);
+          }
+        }
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === "z") {
+        console.log("onKeyUp");
+        setZHeld(false);
+        lensDiv.style.opacity = "0";
+      }
+    };
+
   const onLeave = () => { setHover(false); DrawCanvas(); };
 const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
 
@@ -618,6 +727,15 @@ function CenterAtVert(center:number)
   setNewTop(clampedTop);    
 }
 
+function setupLensCanvas() {
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    lensCanvas.style.width = `${lensSize}px`;
+    lensCanvas.style.height = `${lensSize}px`;
+    lensCanvas.width = Math.round(lensSize * dpr);
+    lensCanvas.height = Math.round(lensSize * dpr);
+    //lensCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
 function CenterAtHor(center:number)
 {
   setScrollX(center);  
@@ -639,6 +757,7 @@ const hexProper = () => {
     //let timerId:number=0;
     onMount(() => {
         img.onload = () => {
+            lensCtx = lensCanvas.getContext("2d")!;
             backCanvas.width = img.width;
             backCanvas.height = img.height;
             backCtx!.drawImage(img, 0, 0);
@@ -649,30 +768,25 @@ const hexProper = () => {
 
             CenterAtVert(0);
             CenterAtHor(img.width/2-divWidth()/2);
-            
-            //setNewLeft();  
+                     
+            setupLensCanvas();           
             DrawCanvas();
-            
-            /*if(timerId ==0 )
-            {
-                timerId = setInterval(() => {
-                addLine();
-                DrawCanvas()
-              }, 1000);
-            }*/
-
+                     
           };
      
-          if(canvasRef)
+          if(canvasRef!)
           {         
+            window.addEventListener("keydown", onKeyDown);
+            window.addEventListener("keyup", onKeyUp);
             canvasRef.addEventListener("mousemove", onMove);
             canvasRef.addEventListener("mousedown", onMouseDown);
             canvasRef.addEventListener("mouseenter", onEnter);
             canvasRef.addEventListener("mouseleave", onLeave);
+            
           }
         updateCanvasSize();
         //  DrawCanvas();
-        const ro = new ResizeObserver(() => {updateCanvasSize();DrawCanvas();});
+        const ro = new ResizeObserver(() => {updateCanvasSize();setupLensCanvas();DrawCanvas();});
         if (divRef) {
             ro.observe(divRef);}
 
@@ -686,23 +800,30 @@ const hexProper = () => {
      // }
     });
   
-    //<div style={{ display: "flex", width: "812px" }}></div>
-    /*style={{
-        //display: "block",
-        width: "100%",//"800px",
-        height: `${viewportHeight}px`,
-      }}*/
+  const lensStyle: Partial<CSSStyleDeclaration> = {
+    position: "fixed",                 // follows the page cursor
+    left: "10px",
+    top: "10px",
+    width: `${lensSize}px`,
+    height: `${lensSize}px`,
+    pointerEvents: "none",             // let mouse pass through
+    opacity: "50%",                      // hidden until 'm' is held
+    transition: "opacity 80ms linear",
+    border: "1px solid rgba(255,255,255,.3)",
+    boxShadow: "0 6px 20px rgba(0,0,0,.35)",
+    borderRadius: "100px",
+    overflow: "hidden",
+    background: "#000",
+    zIndex: "9999",
+  };
+
     return (
       <>
       <div class="wfSB" id="contSBArea" ref={divRef} onWheel={handleWheel}>
-        <canvas class="testCanv"
-          ref={canvasRef!}
-          
-         // width={210}
-         // height={500}
-         
-        />
-   
+        <canvas class="testCanv" ref={canvasRef!}/>
+        <div ref={lensDiv} style={lensStyle}>
+            <canvas ref={lensCanvas} />
+          </div>
   
       
        
@@ -729,7 +850,7 @@ const hexProper = () => {
           //rgba = {rgba()}
         //  text = "hej2"
         />
-
+       
     
       </>
     );
