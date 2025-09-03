@@ -1,4 +1,4 @@
-import { createSignal, onMount, onCleanup, createEffect, JSX, Accessor } from "solid-js";
+import { createSignal, onMount, onCleanup, createEffect, JSX, Accessor, createMemo } from "solid-js";
 import { MSSEvent } from '../events';
 import InfoView from "./InfoView";
 
@@ -272,6 +272,8 @@ export default function SBComp()
     const [hover, setHover] = createSignal(false);    
     const [rgba, setRgba] = createSignal<RGBA>([0,0,0,255]);
     const [zHeld, setZHeld] = createSignal(false);
+    const [cliCenter, setCliCenter] = createSignal(100);
+    const [isTop, setIsTop] = createSignal(true);
 
     const css = () => {
     const [r, g, b, a] = rgba();
@@ -326,6 +328,7 @@ export default function SBComp()
   if (!canvasRef)
     return { x: 0, y: 0 };
 
+  console.log(imgX);
   // image → device pixels inside the canvas
   // (apply zoom, then remove scroll)
   let dx = imgX * zoom() - scrollX();
@@ -339,6 +342,7 @@ export default function SBComp()
   const cliX = dx / dpr();
   const cliY = dy / dpr();
 
+  
   return { x: cliX, y: cliY };
 };
   
@@ -485,6 +489,10 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
     const DrawCanvas = () => {
         if(!canvasRef)
             return;
+
+        /*let w = backCanvas.width/2;
+        const p = img2Cli(w, 0);
+        setCliCenter(p.x);*/
 
         //console.log("DrawCanvas");
         const ctx = canvasRef.getContext("2d", { willReadFrequently: true });
@@ -799,6 +807,17 @@ const hexProper = () => {
         document.addEventListener("mssevent", HandleMssEvent as EventListener);  
     });
   
+    createMemo(() => {
+      let z = contentWidth();
+      let w = backCanvas.width/2;
+      const p = img2Cli(w, 0);
+      setCliCenter(p.x);          
+    });
+
+    createMemo(() => {
+      setIsTop(scrollY() == 0);
+    });
+
     createEffect(() => {
      // if (canvasRef) {
         DrawCanvas();
@@ -837,7 +856,32 @@ const hexProper = () => {
         <div class="lens" ref={lensDiv} style={lensStyle}>
             <canvas ref={lensCanvas}  style={lensCanvStyle}/>
           </div>
-  
+         {/* Top overlay with an image icon; shown only on hover */}
+      
+      <div
+        style={{
+          position: "absolute",
+          left: `${cliCenter()}px`,//"50%",
+          top: "0px",
+          transform: "translateX(-50%) scale(100%)",
+          display: "flex",
+         // "align-items": "center",
+          gap: "8px",
+          padding: "6px 10px",
+          "border-radius": "8px",
+          background: "rgba(0,0,0,0)",
+          color: "white",
+          //"box-shadow": "20px 20px 5px rgb(0, 0, 0, 1.5)",
+          "pointer-events": "none",         // don’t block canvas events
+          opacity: isTop() ? 1 : 0,         // show on hover
+          transition: "opacity 120ms ease",
+          "z-index": 10,
+        }}
+      >
+        {/* Image icon (inline SVG). Swap for <img src="/path/icon.png" /> if you prefer */}
+     
+        <svg fill="#ffe400ff" stroke="#000000" stroke-width="0.2" stroke-opacity="0.85" width="80px" height="80px" viewBox="0 0 25 25" xmlns="http://www.w3.org/2000/svg"><path d="m24.794 16.522-.281-2.748-10.191-5.131s.091-1.742 0-4.31c-.109-1.68-.786-3.184-1.839-4.339l.005.006h-.182c-1.048 1.15-1.726 2.653-1.834 4.312l-.001.021c-.091 2.567 0 4.31 0 4.31l-10.19 5.131-.281 2.748 6.889-2.074 3.491-.582c-.02.361-.031.783-.031 1.208 0 2.051.266 4.041.764 5.935l-.036-.162-2.728 1.095v1.798l3.52-.8c.155.312.3.566.456.812l-.021-.035v.282c.032-.046.062-.096.093-.143.032.046.061.096.094.143v-.282c.135-.21.28-.464.412-.726l.023-.051 3.52.8v-1.798l-2.728-1.095c.463-1.733.728-3.723.728-5.774 0-.425-.011-.847-.034-1.266l.003.058 3.492.582 6.888 2.074z"/></svg>
+      </div>
       
        
       </div>
@@ -880,4 +924,7 @@ const hexProper = () => {
         <span>{(() => { const {x,y}=imgPos(); const [r,g,b,a]=rgba(); return `(${Math.round(x)}, ${Math.round(y)}) ${hexProper()} rgba(${r},${g},${b},${a})`; })()}</span>
         </div>
       </div>
-  */
+  
+     <svg xmlns='http://www.w3.org/2000/svg' fill='#00FF10ff' fill-opacity='1' stroke='#007F10' stroke-opacity='0.85' stroke-linejoin='bevel' stroke-width='5' width='240' height='240'><path d='M 194.67321,2.8421709e-14 L 70.641958,53.625 C 60.259688,46.70393 36.441378,32.34961 31.736508,30.17602 C -7.7035221,11.95523 -5.2088921,44.90709 11.387258,54.78122 C 15.926428,57.48187 39.110778,71.95945 54.860708,81.15624 L 72.766958,215.09374 L 94.985708,228.24999 L 106.51696,107.31249 L 178.04821,143.99999 L 181.89196,183.21874 L 196.42321,191.84374 L 207.51696,149.43749 L 207.64196,149.49999 L 238.45446,117.96874 L 223.57946,109.96874 L 187.95446,126.87499 L 119.67321,84.43749 L 217.36071,12.25 L 194.67321,2.8421709e-14 z'/></svg>
+      */
+

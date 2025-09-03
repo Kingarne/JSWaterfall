@@ -13,7 +13,9 @@ import logo from './logo.svg';
 const App: Component = () => {
 
   //var sdpSocket = new WebSocket("ws://10.71.3.112:1234");
-  var sdpSocket = new WebSocket("ws://localhost:1234");
+  //var sdpSocket = new WebSocket("ws://localhost:1234");
+  var sdpSocket = new WebSocket("ws://" + window.location.hostname + ":1234");
+  
   //let socket = new WebSocket("wss//stream.aisstream.io/v0/stream");
   /*let socket = new WebSocket("ws://localhost/v0/stream");
   
