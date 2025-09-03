@@ -328,7 +328,6 @@ export default function SBComp()
   if (!canvasRef)
     return { x: 0, y: 0 };
 
-  console.log(imgX);
   // image → device pixels inside the canvas
   // (apply zoom, then remove scroll)
   let dx = imgX * zoom() - scrollX();
@@ -390,7 +389,7 @@ function drawLensAt(clientX: number, clientY: number) {
     if (left + lensSize > vw) left = clientX - lensSize - pad;
     if (top + lensSize > vh) top = clientY - lensSize - pad;
 
-    console.log("cli: " + clientX + ", " + clientY);
+    //console.log("cli: " + clientX + ", " + clientY);
     //lensDiv.style.transform = `translate3d(${left}px, ${top}px, 0)`;
     lensDiv.style.transform = `translate3d(${clientX}px, ${clientY}px, 0)`;
 
@@ -563,15 +562,15 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
       }
 
       if (!e.shiftKey) {  
-        let y = scrollY() + e.deltaY/2;                      
-        console.log("canvas wheel: " + y);
+        console.log("canvas wheel: " + scrollY());
+        let y = scrollY() + e.deltaY/2;                             
         const maxY = contentHeight()-divHeight();
         const clampedY = Math.max(0, Math.min(y, maxY));
         CenterAtVert(clampedY);
       }
       else
       {
-       
+        
         let x = scrollX() + e.deltaY/2;
       //  console.log("canvas wheel: " + x);
         const maxX = contentWidth()-divWidth();
@@ -608,7 +607,7 @@ function addSlarLine(slar:any) : number
     if (!slar.data.pixels) {
 		return -1;
 	}
-    console.log("length: ", slar.data.pixels);
+    //console.log("length: ", slar.data.pixels);
 	
     if(wfInsertPos < 0)
         GrowCanvas(60*5); 
@@ -658,7 +657,9 @@ function addSlarLine(slar:any) : number
             
             if(addSlarLine(data.slar) >= 0)
             {
-              setContentHeight(contentHeight()+1);              
+              setContentHeight(contentHeight()+1);     
+              if(scrollY() != 0)
+                setScrollY(scrollY()+zoom());         
               DrawCanvas();
               //pick(100,100);
             }
@@ -728,7 +729,7 @@ function CenterAtImgHor(cx:number)
 
 function CenterAtVert(center:number)
 {
-  console.log("centerY: " + center + "cH: " + contentHeight());
+ // console.log("centerY: " + center + "cH: " + contentHeight());
   setScrollY(center);
 
   const fac = center / (contentHeight()-divHeight());
@@ -737,7 +738,7 @@ function CenterAtVert(center:number)
   const top = fac * maxTop;
   const clampedTop = Math.max(0, Math.min(top, maxTop));
 
-  //console.log("New top: " + clampedTop + ", " + maxTop);
+  console.log("New top: " + center + ", " + clampedTop);
   setNewTop(clampedTop);    
 }
 
@@ -871,10 +872,11 @@ const hexProper = () => {
           "border-radius": "8px",
           background: "rgba(0,0,0,0)",
           color: "white",
+          "filter": "drop-shadow(20px 20px 2px rgba(0, 0, 0, 0.5))",
           //"box-shadow": "20px 20px 5px rgb(0, 0, 0, 1.5)",
           "pointer-events": "none",         // don’t block canvas events
           opacity: isTop() ? 1 : 0,         // show on hover
-          transition: "opacity 120ms ease",
+          transition: "opacity 420ms ease",
           "z-index": 10,
         }}
       >
