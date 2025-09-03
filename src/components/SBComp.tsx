@@ -285,7 +285,9 @@ export default function SBComp()
   };
 
 
-    const imgBmp = new URL('../assets/SLAR-mark.bmp', import.meta.url).href
+    const slarDat = new URL('../assets/SLAR_10420003.dat', import.meta.url).href  
+    const imgBmp = new URL('../assets/SLAR-smal2.bmp', import.meta.url).href
+    //const imgBmp = new URL('../assets/SLAR-mark.bmp', import.meta.url).href
    // const imgBmp = new URL('../assets/SLAR-large.bmp', import.meta.url).href
     const img = new Image();
     // Optionally handle cross-origin images (if needed).
@@ -349,7 +351,7 @@ export default function SBComp()
 
     ix = ix/zoom();
     iy = iy/zoom();
-    
+   //z iy = iy+wfInsertPos;
   //console.log("p:" + ix + "," + iy);
 
     return { x: (ix), y: (iy) };
@@ -364,7 +366,7 @@ export default function SBComp()
     const p = cli2Img(clientX, clientY);
     setCliPos({x:clientX, y:clientY});
    
-    const data = backCtx!.getImageData(p.x, p.y, 1, 1).data;
+    const data = backCtx!.getImageData(p.x, p.y+wfInsertPos, 1, 1).data;
     setImgPos({x:p.x, y:p.y});
     setRgba([data[0], data[1], data[2], data[3]]);
 
@@ -413,7 +415,7 @@ function drawLensAt(clientX: number, clientY: number) {
    // lensCtx.save();
     lensCtx.imageSmoothingEnabled = false;
 
-    lensCtx.drawImage(backCanvas, sx, sy, srcW, srcH, 0, 0, lensSize, lensSize);
+    lensCtx.drawImage(backCanvas, sx, wfInsertPos+sy, srcW, srcH, 0, 0, lensSize, lensSize);
    // lensCtx.restore();
     // Optional crosshair
     lensCtx.strokeStyle = "rgba(219, 43, 43, 0.6)";
@@ -647,7 +649,11 @@ function addSlarLine(slar:any) : number
             //console.log("SDPStatusMessage");
             
             if(addSlarLine(data.slar) >= 0)
+            {
+              setContentHeight(contentHeight()+1);              
               DrawCanvas();
+              //pick(100,100);
+            }
             break;        
           }
         }
@@ -810,7 +816,7 @@ const hexProper = () => {
     opacity: "0%",                      // hidden until 'm' is held
     transition: "opacity 80ms linear",
     border: "2px solid rgba(255,255,255,.3)",
-    boxShadow: "0 6px 20px rgba(0,0,0,.35)",
+    boxShadow: "0 6px 20px rgba(10,10,z0,.35)",
     borderRadius: "9999px",
     overflow: "hidden",
     background: "#000",
