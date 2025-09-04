@@ -1,6 +1,8 @@
 import { createSignal, onMount, onCleanup, createEffect, JSX, Accessor, createMemo } from "solid-js";
 import { MSSEvent } from '../events';
 import InfoView from "./InfoView";
+import SettingsOverlay from "./SettingButt";
+import NavOverlay from "./NavOverlay";
 
 interface ScrollbarProps {
   newTop:number;
@@ -274,7 +276,17 @@ export default function SBComp()
     const [zHeld, setZHeld] = createSignal(false);
     const [cliCenter, setCliCenter] = createSignal(100);
     const [isTop, setIsTop] = createSignal(true);
-
+ const [navJson, setNavJson] = createSignal<string>(
+    JSON.stringify({
+      lat: 59.3293,
+      lon: 18.0686,
+      speed: 14.2,        // knots
+      heading: 73,        // degrees
+      alt: 120,           // meters
+      time: new Date().toISOString(),
+    })
+  );
+  
     const css = () => {
     const [r, g, b, a] = rgba();
     return `rgba(${r}, ${g}, ${b}, ${a / 255})`;
@@ -872,7 +884,7 @@ const hexProper = () => {
           "border-radius": "8px",
           background: "rgba(0,0,0,0)",
           color: "white",
-          "filter": "drop-shadow(20px 20px 2px rgba(0, 0, 0, 0.5))",
+          "filter": "drop-shadow(20px 20px 2zzzzzzzzzzzzzzzzzzzzzpx rgba(0, 0, 0, 0.5))",
           //"box-shadow": "20px 20px 5px rgb(0, 0, 0, 1.5)",
           "pointer-events": "none",         // don’t block canvas events
           opacity: isTop() ? 1 : 0,         // show on hover
@@ -910,6 +922,15 @@ const hexProper = () => {
         //  text = "hej2"
         />
        
+        <SettingsOverlay
+        onChange={({ enabled, value }) => {
+          // apply settings to your app here
+          // e.g., toggle a feature, adjust intensity from slider
+        }}
+        initialEnabled={true}
+        initialValue={10}
+      />
+      <NavOverlay json={navJson()} latLonFormat="dec" units={{ speed: "kn", altitude: "m" }} />
     
       </>
     );
