@@ -281,7 +281,7 @@ export default function SBComp()
       lat: 59.3293,
       lon: 18.0686,
       speed: 14.2,        // knots
-      heading: 73,        // degrees
+      heading: 72,        // degrees
       alt: 120,           // meters
       time: new Date().toISOString(),
     })
@@ -291,6 +291,8 @@ export default function SBComp()
     const [r, g, b, a] = rgba();
     return `rgba(${r}, ${g}, ${b}, ${a / 255})`;
   };
+  
+  let lastNavTime = 0;          // timestamp of last setNav
 
   const updateOverlayPos = () => {
     if (!canvasRef) return;
@@ -675,6 +677,22 @@ function addSlarLine(slar:any) : number
               DrawCanvas();
               //pick(100,100);
             }
+
+            if(Date.now()-lastNavTime > 500)
+            {                        
+              const obj ={lat: data.gnss.latitude,
+              lon: data.gnss.longitude,
+              speed: data.gnss.speed,        // knots
+              heading: data.fms.true_heading!.heading,        // degrees
+              alt: data.gnss.altitude,           // meters
+              time: new Date().toISOString()};            
+
+              const str = JSON.stringify(obj);
+              //console.log(str);    
+              setNavJson( str);
+              lastNavTime = Date.now();
+            }
+
             break;        
           }
         }
