@@ -1,13 +1,13 @@
 import { createSignal, onMount, onCleanup, createEffect, JSX, Accessor, createMemo } from "solid-js";
 
-interface ScrollbarProps {
+interface ScrollbarVProps {
   newTop:number;
   wndHeight: number;
   contentHeight: number;
   onScroll: (scrollY: number) => void;
 }
 
-export default function Scrollbar(props: ScrollbarProps) {
+export default function ScrollbarV(props: ScrollbarVProps) {
   const [dragging, setDragging] = createSignal(false);
   const [thumbTop, setThumbTop] = createSignal(0);
   let trackRef: HTMLDivElement;
@@ -21,7 +21,7 @@ export default function Scrollbar(props: ScrollbarProps) {
     const clampedTop = Math.max(0, Math.min(top, maxTop));
     setThumbTop(clampedTop);
     const scrollY = (clampedTop / maxTop) * (props.contentHeight - props.wndHeight);
-    console.log("updateScrollY:", top, scrollY);
+   // console.log("updateScrollY:", top, scrollY);
     props.onScroll(scrollY);
   };
 

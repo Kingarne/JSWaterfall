@@ -62,9 +62,11 @@ body {
    position: relative; 
   /* float: left; */
   height: 100%;
-    width: 100%;  
-    border-radius: 23;
+    width: 100%;      
+    border-radius: 5;
     cursor:crosshair;
+    display: flex;
+    justify-content: center;
  
   
 }
@@ -109,7 +111,7 @@ body {
 .lens{       
     border-radius: 9999px;
     box-shadow: 20px 20px 5px rgb(0, 0, 0, 0.5);
-}
+    pointer-events: none;
 
 .info{
   position: absolute;

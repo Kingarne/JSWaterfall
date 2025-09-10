@@ -53,6 +53,7 @@ export default function SBComp()
     const [zHeld, setZHeld] = createSignal(false);
     const [cliCenter, setCliCenter] = createSignal(100);
     const [isTop, setIsTop] = createSignal(true);
+    const [offsetX, setOffsetX] = createSignal(0);
     const [navJson, setNavJson] = createSignal<string>(
     JSON.stringify({
       lat: 59.3293,
@@ -65,10 +66,17 @@ export default function SBComp()
   );
   
     const css = () => {
-    const [r, g, b, a] = rgba();
-    return `rgba(${r}, ${g}, ${b}, ${a / 255})`;
-  };
-  
+      const [r, g, b, a] = rgba();
+      return `rgba(${r}, ${g}, ${b}, ${a / 255})`;
+    };
+
+  // Drag state
+  const [dragging, setDragging] = createSignal(false);
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let startScrollX = 0;
+  let startScrollY = 0;
+
   let lastNavTime = 0;          // timestamp of last setNav
 
   const updateOverlayPos = () => {
@@ -129,7 +137,7 @@ export default function SBComp()
   dy = Math.min(canvasRef.height - 1, Math.max(0, Math.floor(dy)));
 
   // device px → client (CSS) px
-  const cliX = dx / dpr();
+  const cliX = dx / dpr() + offsetX();
   const cliY = dy / dpr();
 
   
@@ -142,6 +150,7 @@ export default function SBComp()
 
     let ix = scrollX() + Math.min(canvasRef.width - 1, Math.max(0, Math.floor(cliX * dpr())));
     let iy = scrollY() + Math.min(canvasRef.height - 1, Math.max(0, Math.floor(cliY * dpr())));
+    ix = ix-offsetX();
 
     ix = ix/zoom();
     iy = iy/zoom();
@@ -223,25 +232,65 @@ function drawLensAt(clientX: number, clientY: number) {
 }
 
   // --- Event listeners on the <canvas> ---
-  const onMove = (e: MouseEvent) => {
+  const onPointerMove = (e: PointerEvent) => {
     const p = toLocal(e);
     pick(e.clientX, e.clientY);
     
     if (hover() && zHeld()) {
         lensDiv.style.opacity = "1";
         drawLensAt(e.clientX, e.clientY);
+        return;
       }
+
+      if (!dragging()) return;
+      // If the left button is released, stop dragging
+      if ((e.buttons & 1) === 0) {
+        setDragging(false);
+        canvasRef.style.cursor = "crosshair";
+        return;
+      }
+
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+
+      let y = scrollY() - dy;                                   
+      const clampedY = Math.max(0, Math.min(y, (contentHeight()-divHeight())));
+      CenterAtVert(clampedY);
+
+      let x = scrollX() - dx; 
+      const clampedX = Math.max(0, Math.min(x, (contentWidth()-divWidth())));
+      CenterAtHor(clampedX);
+
+//      console.log("dx:" + dx + ", dy: " + dy);
     //setPos(p);
    // updateOverlayPos();
    // DrawCanvas();
   };
-  const onMouseDown = (e: MouseEvent) => {
+  
+
+  const onPointerDown = (e: PointerEvent) => {
      //CenterAtImgVert( imgPos().y);
-     CenterAtImg(imgPos().x, imgPos().y);     
+      if (e.button !== 0) return; // left only
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+     setDragging(true);
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      startScrollX = scrollX();
+      startScrollY = scrollY();
+      canvasRef.style.cursor = "grabbing";
+
+     //CenterAtImg(imgPos().x, imgPos().y);     
 
     console.log("down:", imgPos().y)
   };
-  
+  const onPointerUp = () => {
+      setDragging(false);
+      canvasRef.style.cursor = "crosshair";
+    };
+
+
   const onEnter = (e: MouseEvent) => { 
     console.log("onEnter");
     setHover(true); 
@@ -300,7 +349,9 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
               //console.log("Image is already loaded.");
              // ctx.drawImage(backCanvas, 0, wfInsertPos+scrollY(), backCanvas.width, canvasRef.height, 0, 0, canvasRef.width, canvasRef.height);
           //   const zoom = 1.0; 
-             ctx.drawImage(backCanvas, scrX/zoom(), wfInsertPos+scrY/zoom(), canvasRef.width/zoom(), canvasRef.height/zoom(), 0, 0, canvasRef.width, canvasRef.height);
+            
+             console.log(contentWidth() + ", " + divWidth())
+             ctx.drawImage(backCanvas, scrX/zoom(), wfInsertPos+scrY/zoom(), canvasRef.width/zoom(), canvasRef.height/zoom(), offsetX(), 0, canvasRef.width, canvasRef.height);
             //  console.log("draw canvas");
             }
         }
@@ -347,25 +398,22 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
         setContentWidth(backCanvas.width*zoom());
         CenterAtImg( imgPos().x, imgPos().y);///zoom());
         //CenterAtHor(scrollX());///zoom());
-        console.log("newz: " + newz + ", " + backCanvas.height*zoom());
+       // console.log("newz: " + newz + ", " + backCanvas.height*zoom());
 
         return;
       }
 
       if (!e.shiftKey) {  
-        console.log("canvas wheel: " + scrollY());
-        let y = scrollY() + e.deltaY/2;                             
-        const maxY = contentHeight()-divHeight();
-        const clampedY = Math.max(0, Math.min(y, maxY));
+        //console.log("canvas wheel: " + scrollY());
+        let y = scrollY() + e.deltaY/2;                                     
+        const clampedY = Math.max(0, Math.min(y, (contentHeight()-divHeight())));
         CenterAtVert(clampedY);
       }
       else
       {
         
-        let x = scrollX() + e.deltaY/2;
-      //  console.log("canvas wheel: " + x);
-        const maxX = contentWidth()-divWidth();
-        const clampedX = Math.max(0, Math.min(x, maxX));
+        let x = scrollX() + e.deltaY/2;      
+        const clampedX = Math.max(0, Math.min(x, (contentWidth()-divWidth())));
         CenterAtHor(clampedX);
       }
 
@@ -494,13 +542,13 @@ function CenterAtImg(cx:number, cy:number)
 
 function CenterAtImgVert(cy:number)
 {
-  console.log("centerY: " + cy + "cH: " + contentHeight());
+  //console.log("centerX: " + cx + ", cH: " + contentHeight());
   const maxY = contentHeight()-divHeight();
 
   
   const newC = cy*zoom()-(divHeight()/2);
   const clampedY = Math.max(0, Math.min(newC, maxY));
-  console.log("newC: " + clampedY);
+ // console.log("newC: " + clampedY);
   setScrollY(clampedY);
 
   const fac = clampedY / (contentHeight()-divHeight());
@@ -515,7 +563,7 @@ function CenterAtImgVert(cy:number)
 
 function CenterAtImgHor(cx:number)
 {
-  console.log("centerY: " + cx + "cH: " + contentHeight());
+  //console.log("centerY: " + cx + ", cH: " + contentHeight());
   const maxX = contentWidth()-divWidth();
   
   const newC = cx*zoom()-(divWidth()/2);
@@ -536,7 +584,7 @@ function CenterAtImgHor(cx:number)
 
 function CenterAtVert(center:number)
 {
- // console.log("centerY: " + center + "cH: " + contentHeight());
+  //console.log("centerY: " + center + "cH: " + contentHeight());
   setScrollY(center);
 
   const fac = center / (contentHeight()-divHeight());
@@ -545,7 +593,7 @@ function CenterAtVert(center:number)
   const top = fac * maxTop;
   const clampedTop = Math.max(0, Math.min(top, maxTop));
 
-  console.log("New top: " + center + ", " + clampedTop);
+  //console.log("New top: " + center + ", " + clampedTop);
   setNewTop(clampedTop);    
 }
 
@@ -600,8 +648,10 @@ const hexProper = () => {
           {         
             window.addEventListener("keydown", onKeyDown);
             window.addEventListener("keyup", onKeyUp);
-            canvasRef.addEventListener("mousemove", onMove);
-            canvasRef.addEventListener("mousedown", onMouseDown);
+            canvasRef.addEventListener("pointermove", onPointerMove);
+            //canvasRef.addEventListener("mousedown", onMouseDown);
+            canvasRef.addEventListener("pointerdown", onPointerDown);
+            canvasRef.addEventListener("pointerup", onPointerUp);
             canvasRef.addEventListener("mouseenter", onEnter);
             canvasRef.addEventListener("mouseleave", onLeave);
             
@@ -624,6 +674,13 @@ const hexProper = () => {
 
     createMemo(() => {
       setIsTop(scrollY() == 0);
+    });
+
+    createMemo(() => {
+      let offsX = 0;
+      if(contentWidth() < divWidth())
+         offsX = (divWidth()-contentWidth()) / 2;
+      setOffsetX(offsX);
     });
 
     createEffect(() => {
@@ -679,7 +736,7 @@ const hexProper = () => {
           "border-radius": "8px",
           background: "rgba(0,0,0,0)",
           color: "white",
-          "filter": "drop-shadow(20px 20px 2zzzzzzzzzzzzzzzzzzzzzpx rgba(0, 0, 0, 0.5))",
+          "filter": "drop-shadow(20px 20px 2px rgba(0, 0, 0, 0.5))",
           //"box-shadow": "20px 20px 5px rgb(0, 0, 0, 1.5)",
           "pointer-events": "none",         // don’t block canvas events
           opacity: isTop() ? 1 : 0,         // show on hover
@@ -700,27 +757,27 @@ const hexProper = () => {
         wndHeight={divHeight()}
         contentHeight={contentHeight()}
         onScroll={(y) => setScrollY(y)}
-        />
-        <ScrollbarH
+      />
+      <ScrollbarH
         ref={scHRef!}
         newLeft={newLeft()}
         wndWidth={divWidth()}
         contentWidth={contentWidth()}
         onScroll={(x) =>{ setScrollX(x);}}
-        />
+      />
         
-        <InfoView
+      <InfoView
           ref={infoV!}
           rgba={rgba()}
           p={imgPos()}
           //rgba = {rgba()}
         //  text = "hej2"
-        />
-       
-        <SettingsOverlay
+      />
+      
+      <SettingsOverlay
         onChange={({ enabled, value }) => {
-          // apply settings to your app here
-          // e.g., toggle a feature, adjust intensity from slider
+        // apply settings to your app here
+        // e.g., toggle a feature, adjust intensity from slider
         }}
         initialEnabled={true}
         initialValue={10}
