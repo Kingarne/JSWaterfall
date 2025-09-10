@@ -19,8 +19,6 @@ export default function NavTableOverlay(props: {
   let parsed = createMemo(() => {
     try {
       let o = JSON.parse(props.json ?? "{}") as Record<string, unknown>;
-       console.log("change");
-      console.log(o);
       return { ok: true as const, obj: o };
     } catch (e: any) {
       return { ok: false as const, err: e?.message ?? "Parse error" };
@@ -55,7 +53,7 @@ export default function NavTableOverlay(props: {
   function fmtVal(k: string, v: unknown): string {
     const asNum = (x: any) => (Number.isFinite(+x) ? +x : undefined);
 
-    console.log(k, v);
+    
     // time
     if (k === "time" || k === "timestamp" || k === "ts") {
       if (typeof v === "number") {
@@ -155,7 +153,7 @@ export default function NavTableOverlay(props: {
     whiteSpace: "nowrap",
   };
   const thStyle: Partial<CSSStyleDeclaration> = { color: "#a5b4fc", padding: "2px 8px", textAlign: "left" };
-  const tdStyle: Partial<CSSStyleDeclaration> = { padding: "2px 8px", color: "#e5eefc" };
+  const tdStyle: Partial<CSSStyleDeclaration> = { padding: "2px 8px", color: "#ffe400" };
 
   var p = parsed();
 
@@ -170,7 +168,7 @@ export default function NavTableOverlay(props: {
           onClick={() => setOpen(!open())}
         >
           {/* always-visible right tab (chevron) */}
-          <div style={tabStyle}>{open() ? "»" : "«"}</div>
+          <div style={tabStyle}>{open() ? ">>" : "<<"}</div>
 
           {!p.ok ? (
             <div style={{ color: "#fca5a5" }}>Parse error: {p.err}</div>
