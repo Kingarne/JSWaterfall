@@ -102,7 +102,7 @@ export default function NavTableOverlay(props: {
     right: "16px",
     top: "16px",
     zIndex: "9999",
-    pointerEvents: "none", // only the tray is clickable
+    //"pointer-events": "none",         // don’t block canvas events
   };
   const tabW = 28; // visible tab width when collapsed
   const trayStyle = (): Partial<CSSStyleDeclaration> => ({
@@ -140,7 +140,7 @@ export default function NavTableOverlay(props: {
     height: "100%",
     display: "grid",
     placeItems: "center",
-    color: "#a5b4fc",
+    //color: "#a5b4fc",
     background: "linear-gradient(90deg, transparent, rgba(99,102,241,0.12))",
     borderTopRightRadius: "12px",
     borderBottomRightRadius: "12px",
@@ -152,7 +152,7 @@ export default function NavTableOverlay(props: {
     borderSpacing: "0 6px",
     whiteSpace: "nowrap",
   };
-  const thStyle: Partial<CSSStyleDeclaration> = { color: "#a5b4fc", padding: "2px 8px", textAlign: "left" };
+  const thStyle: Partial<CSSStyleDeclaration> = {  padding: "2px 8px", textAlign: "left", color:"#82d682"};
   const tdStyle: Partial<CSSStyleDeclaration> = { padding: "2px 8px", color: "#ffe400" };
 
   var p = parsed();

@@ -1,3 +1,8 @@
+:root {
+  --head: #82d682;
+  --white: #ffffff;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
@@ -108,14 +113,20 @@ body {
   
 }
 
+.head{
+  color: var(--head);
+}
+
 .lens{       
     border-radius: 9999px;
     box-shadow: 20px 20px 5px rgb(0, 0, 0, 0.5);
     pointer-events: none;
+}
 
 .info{
   position: absolute;
   left:0;
   background-color: #68686892;
+  color: var(--head);
  /* visibility: hidden;*/
 }
