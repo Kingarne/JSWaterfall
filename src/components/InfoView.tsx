@@ -1,5 +1,6 @@
 import { createSignal, onMount, onCleanup, createEffect, JSX, Accessor, Setter } from "solid-js";
 import { createMemo } from "solid-js";
+import { LineDataHead } from "./DatParser";
 
 type RGBA = [number, number, number, number];
 type Point = { x: number; y: number };
@@ -12,6 +13,7 @@ type Point = { x: number; y: number };
 interface InfoProps{
     p:Point;
     rgba:RGBA;
+    meta:LineDataHead;
 
     //   rgba: Accessor<RGBA>;
   //  text: string;
@@ -70,7 +72,8 @@ export default function InfoView(props:InfoProps)
         }}> 
         <div style={{ display: 'flex', 'align-items': 'center', gap: '8px' }}>  
         <span class="jek" style={{ display: 'inline-block', width: '14px', height: '14px', 'border-radius': '3px', background: hexProper(), border: '1px solid rgba(255,255,255,0.2)' }} />
-        <span>{(() => { const {x,y}=props.p; const [r,g,b,a]=props.rgba; return `(${pt()}), (${Math.round(x)}, ${Math.round(y)}) `; })()}</span>
+        <span>{(() => { const {x,y}=props.p; const [r,g,b,a]=props.rgba; return `${pt()}, (${Math.round(x)}, ${Math.round(y)}) `; })()}</span>
+        <div>{(() => { const h= props.meta.fHeading; return `${h}`; })()}</div>
         </div>
         </div>
             

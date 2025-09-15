@@ -5,7 +5,9 @@ import SettingsOverlay from "./SettingButt";
 import NavOverlay from "./NavOverlay";
 import ScrollbarV from "./ScrollbarV";
 import ScrollbarH from "./ScrollbarH";
-
+import { ParsedDat, readDatData  } from "./DatParser";
+import { linesToGrayscaleImageData } from "./DatParser";
+import { LineDataHead } from "./DatParser";
 
 type RGBA = [number, number, number, number];
 type Point = { x: number; y: number };
@@ -17,6 +19,17 @@ type ZoomLensProps = {
   zoom?: number;      // magnification factor (e.g. 3 = 3x)
   lensSize?: number;  // lens box size in CSS px (square)
   round?: boolean;    // make lens circular
+};
+const DEFAULT_HEAD: LineDataHead = {
+  nTime: 0,
+  fLo: 0,
+  fLa: 0,
+  fHeading: 0,
+  fScale: 1,
+  fAlt: 0,
+  fSpeed: 0,
+  nState: 0n,
+  fSquintAngle: 0,
 };
 
 export default function SBComp() 
@@ -37,6 +50,9 @@ export default function SBComp()
     let lensDiv!: HTMLDivElement;       // floating lens container
     let lensCtx!: CanvasRenderingContext2D;
 
+    let slarData:ParsedDat;
+    let metaData:LineDataHead;
+
     const [zoom, setZoom] = createSignal(1.0);
     const [newTop, setNewTop] = createSignal(0);
     const [newLeft, setNewLeft] = createSignal(0);
@@ -54,6 +70,7 @@ export default function SBComp()
     const [cliCenter, setCliCenter] = createSignal(100);
     const [isTop, setIsTop] = createSignal(true);
     const [offsetX, setOffsetX] = createSignal(0);
+    const [meta, setMeta] = createSignal<LineDataHead>(DEFAULT_HEAD);
     const [navJson, setNavJson] = createSignal<string>(
     JSON.stringify({
       lat: 59.3293,
@@ -89,7 +106,7 @@ export default function SBComp()
     const slarDat = new URL('../assets/SLAR_10420003.dat', import.meta.url).href  
     const imgBmp = new URL('../assets/SLAR-smal2.bmp', import.meta.url).href
     //const imgBmp = new URL('../assets/SLAR-mark.bmp', import.meta.url).href
-   // const imgBmp = new URL('../assets/SLAR-large.bmp', import.meta.url).href
+    //const imgBmp = new URL('../assets/SLAR-large.bmp', import.meta.url).href
     const img = new Image();
     // Optionally handle cross-origin images (if needed).
     // img.crossOrigin = "anonymous";
@@ -157,7 +174,7 @@ export default function SBComp()
    //z iy = iy+wfInsertPos;
   //console.log("p:" + ix + "," + iy);
 
-    return { x: (ix), y: (iy) };
+    return { x: (Math.floor(ix)), y: (Math.floor(iy)) };
   
   }
 
@@ -170,8 +187,17 @@ export default function SBComp()
     setCliPos({x:clientX, y:clientY});
    
     const data = backCtx!.getImageData(p.x, p.y+wfInsertPos, 1, 1).data;
+
     setImgPos({x:p.x, y:p.y});
     setRgba([data[0], data[1], data[2], data[3]]);
+
+    //console.log("lc: " + p.y);
+    if(p.y < slarData.lineCount)
+    {
+       setMeta(slarData.lines[p.y].head);  
+    }
+    //  console.log(meta().fHeading);
+    //  console.log(slarData.lines[p.y].head.fHeading);
 
   };
 
@@ -233,7 +259,7 @@ function drawLensAt(clientX: number, clientY: number) {
 
   // --- Event listeners on the <canvas> ---
   const onPointerMove = (e: PointerEvent) => {
-    const p = toLocal(e);
+    //const p = toLocal(e);
     pick(e.clientX, e.clientY);
     
     if (hover() && zHeld()) {
@@ -283,7 +309,7 @@ function drawLensAt(clientX: number, clientY: number) {
 
      //CenterAtImg(imgPos().x, imgPos().y);     
 
-    console.log("down:", imgPos().y)
+   // console.log("down:", imgPos().y)
   };
   const onPointerUp = () => {
       setDragging(false);
@@ -350,7 +376,7 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
              // ctx.drawImage(backCanvas, 0, wfInsertPos+scrollY(), backCanvas.width, canvasRef.height, 0, 0, canvasRef.width, canvasRef.height);
           //   const zoom = 1.0; 
             
-             console.log(contentWidth() + ", " + divWidth())
+             //console.log(contentWidth() + ", " + divWidth())
              ctx.drawImage(backCanvas, scrX/zoom(), wfInsertPos+scrY/zoom(), canvasRef.width/zoom(), canvasRef.height/zoom(), offsetX(), 0, canvasRef.width, canvasRef.height);
             //  console.log("draw canvas");
             }
@@ -568,7 +594,7 @@ function CenterAtImgHor(cx:number)
   
   const newC = cx*zoom()-(divWidth()/2);
   const clampedX = Math.max(0, Math.min(newC, maxX));
-  console.log("newC: " + clampedX);
+// console.log("newC: " + clampedX);
   setScrollX(clampedX);
 
   const fac = clampedX / (contentWidth()-divWidth());
@@ -619,6 +645,13 @@ function CenterAtHor(center:number)
     setNewLeft(clampedTop);        
 }
 
+
+
+function step(timestamp:DOMHighResTimeStamp) {
+// console.log(timestamp);
+ requestAnimationFrame(step);
+}  
+
 const hexProper = () => {
   const [r,g,b] = rgba();
   const toHex = (n:number) => n.toString(16).padStart(2,'0');
@@ -642,6 +675,39 @@ const hexProper = () => {
             setupLensCanvas();           
             DrawCanvas();
                      
+            
+            //const url = new URL('../assets/SLAR_10420003.dat', import.meta.url).href;
+            const url = new URL('../assets/slar/SLAR_104d0003.dat', import.meta.url).href;
+
+            (async () => {
+              const parsed = await readDatData(url);
+              console.log('Info:', parsed.info);
+              console.log('Lines:', parsed.lineCount);
+              console.log('First head (last in file):', parsed.lines[10]?.head);
+             // console.log('First data bytes:', parsed.lines[0]?.data);
+
+              slarData = parsed;
+
+              // If your parser used lines.unshift(...) (push_front), you usually want flipY=false.
+              // Use flipY=true to show file order (top row = first line read).
+              const imageData = linesToGrayscaleImageData(parsed, /* flipY */ false);
+             
+
+             // const canvas = document.getElementById("cv") as HTMLCanvasElement;
+              //const ctx = canvasRef!.getContext("2d", { willReadFrequently: true })!;
+              //canvasRef!.width = imageData.width;
+              //canvasRef!.height = imageData.height;
+            //backCanvas.width = imageData.width;
+              backCanvas.height = imageData.height;
+              setContentHeight(imageData.height);
+              backCtx!.putImageData(imageData, 0, 0);
+              DrawCanvas();
+            })();
+
+
+             //const canvas = document.getElementById("cv") as HTMLCanvasElement;
+            // drawDatToCanvas(canvasRef);
+            //requestAnimationFrame(step);
           };
      
           if(canvasRef!)
@@ -770,6 +836,7 @@ const hexProper = () => {
           ref={infoV!}
           rgba={rgba()}
           p={imgPos()}
+          meta={meta()}
           //rgba = {rgba()}
         //  text = "hej2"
       />
