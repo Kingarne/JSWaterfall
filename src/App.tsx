@@ -1,7 +1,5 @@
 import {createSignal, onMount, onCleanup} from "solid-js"
 import type { Component } from 'solid-js';
-import MapComponent from './ams';
-import WaterfallCmp from './components/waterfall';
 import SBComp from './components/SBComp';
 import { MSSEvent} from "./events";
 import { SDPStatusMessage } from "./mss";

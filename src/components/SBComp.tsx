@@ -676,8 +676,8 @@ const hexProper = () => {
             DrawCanvas();
                      
             
-            //const url = new URL('../assets/SLAR_10420003.dat', import.meta.url).href;
-            const url = new URL('../assets/slar/SLAR_104d0003.dat', import.meta.url).href;
+            const url = new URL('../assets/slar/SLAR_10420003.dat', import.meta.url).href;
+            //const url = new URL('../assets/slar/SLAR_104d0003.dat', import.meta.url).href;
 
             (async () => {
               const parsed = await readDatData(url);

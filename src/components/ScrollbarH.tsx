@@ -10,6 +10,8 @@ interface ScrollbarHProps {
 export default function ScrollbarH(props: ScrollbarHProps) {
   const [dragging, setDragging] = createSignal(false);
   const [thumbLeft, setThumbLeft] = createSignal(0);
+  const [vis, setVis] = createSignal(true);
+
   let trackRef: HTMLDivElement;
   let thumbRef: HTMLDivElement;
 
@@ -25,9 +27,13 @@ export default function ScrollbarH(props: ScrollbarHProps) {
     props.onScroll(scrollX);
   };
 
+createMemo(()=> {
+    setVis(props.wndWidth<=props.contentWidth);
+})
+
  createEffect(()=> {
     //thumbRef!.innerText = props.newTop.toString();
-    thumbRef!.innerText = thumbLeft().toString();
+    //thumbRef!.innerText = thumbLeft().toString();
   //  console.log("width: " + props.wndWidth);
     //setThumbTop(props.newTop);
  })
@@ -87,7 +93,8 @@ return (
         position: "absolute",
         "margin-top": "8px",   // push it below the parent content
         clear: "both",          // ensure it clears any floated content above
-        bottom: "0px"
+        bottom: "0px",        
+        opacity: vis() ? 1 : 0,
       }}
       onWheel={handleWheel as any}
     >
@@ -98,13 +105,13 @@ return (
           top: "1px",
           height: "85%",
           width: `${thumbWidth()}px`,
-          background: "#88f",
+          background: "linear-gradient(0deg,rgba(171, 164, 164, 1) 0%, rgba(87, 109, 199, 1) 50%, rgba(76, 79, 156, 0.87) 100%)",
           "border-radius": "6px",
           border: "1px solid rgb(82, 87, 110)",
           position: "absolute",
           left: `${thumbLeft()}px`,
           cursor: "pointer",
-          "text-align": "center"
+          "text-align": "center",          
         }}
         onMouseDown={handleMouseDown as any}
         onWheel={handleWheel as any}

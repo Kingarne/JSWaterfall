@@ -10,6 +10,8 @@ interface ScrollbarVProps {
 export default function ScrollbarV(props: ScrollbarVProps) {
   const [dragging, setDragging] = createSignal(false);
   const [thumbTop, setThumbTop] = createSignal(0);
+  const [vis, setVis] = createSignal(true);
+
   let trackRef: HTMLDivElement;
   let thumbRef: HTMLDivElement;
 
@@ -25,9 +27,12 @@ export default function ScrollbarV(props: ScrollbarVProps) {
     props.onScroll(scrollY);
   };
 
+  createMemo(()=> {
+    setVis(props.wndHeight<=props.contentHeight);
+})
  createEffect(()=> {
     //thumbRef!.innerText = props.newTop.toString();
-    thumbRef!.innerText = thumbTop().toString();
+  //  thumbRef!.innerText = thumbTop().toString();
     //console.log("Height: " + props.wndHeight);
     //setThumbTop(props.newTop);
  })
@@ -86,7 +91,8 @@ createEffect(()=> {
         background: "#f0f0f04f",
         position: "absolute",
         //float: "left",
-        right: "0px"
+        right: "0px",
+        opacity: vis() ? 1 : 0,
       }}
       onWheel={handleWheel as any}
     >
@@ -96,7 +102,8 @@ createEffect(()=> {
           left: "1px",
           width: "85%",
           height: `${thumbHeight()}px`,
-          background: "#88f",
+          // background: "#5b81c2",
+          background: "linear-gradient(90deg,rgba(171, 164, 164, 1) 0%, rgba(87, 109, 199, 1) 50%, rgba(76, 79, 156, 0.87) 100%)",
           'border-radius': "6px",
           border: "1px solid rgb(82, 87, 110)",            
           position: "absolute",
