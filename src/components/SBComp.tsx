@@ -8,6 +8,7 @@ import ScrollbarH from "./ScrollbarH";
 import { ParsedDat, readDatData  } from "./DatParser";
 import { linesToGrayscaleImageData } from "./DatParser";
 import { LineDataHead } from "./DatParser";
+import { greatCircle } from "./geo";
 
 type RGBA = [number, number, number, number];
 type Point = { x: number; y: number };
@@ -51,7 +52,7 @@ export default function SBComp()
     let lensCtx!: CanvasRenderingContext2D;
 
     let slarData:ParsedDat;
-    let metaData:LineDataHead;
+    //let metaData:LineDataHead;
 
     const [zoom, setZoom] = createSignal(1.0);
     const [newTop, setNewTop] = createSignal(0);
@@ -103,14 +104,14 @@ export default function SBComp()
   };
 
 
-    const slarDat = new URL('../assets/SLAR_10420003.dat', import.meta.url).href  
-    const imgBmp = new URL('../assets/SLAR-smal2.bmp', import.meta.url).href
+    //const slarDat = new URL('../assets/SLAR_10420003.dat', import.meta.url).href  
+    //const imgBmp = new URL('../assets/SLAR-smal2.bmp', import.meta.url).href
     //const imgBmp = new URL('../assets/SLAR-mark.bmp', import.meta.url).href
     //const imgBmp = new URL('../assets/SLAR-large.bmp', import.meta.url).href
-    const img = new Image();
+   // const img = new Image();
     // Optionally handle cross-origin images (if needed).
     // img.crossOrigin = "anonymous";
-    img.src = imgBmp;
+    //img.src = imgBmp;
     
     let backCanvas = document.createElement('canvas');
     let backCtx = backCanvas.getContext('2d', { willReadFrequently: true } );     
@@ -369,9 +370,9 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
        // ctx.fillRect(0, scrollY(), canvasRef.width, viewHeight());
         let scrX = scrollX();
         let scrY = scrollY();
-        if (img.complete && backCtx ) {
+        if (backCtx ) {
             // Sometimes, an image marked as complete may not have loaded correctly.
-            if (img.naturalWidth !== 0) {
+//            if (img.naturalWidth !== 0) {
               //console.log("Image is already loaded.");
              // ctx.drawImage(backCanvas, 0, wfInsertPos+scrollY(), backCanvas.width, canvasRef.height, 0, 0, canvasRef.width, canvasRef.height);
           //   const zoom = 1.0; 
@@ -379,7 +380,7 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
              //console.log(contentWidth() + ", " + divWidth())
              ctx.drawImage(backCanvas, scrX/zoom(), wfInsertPos+scrY/zoom(), canvasRef.width/zoom(), canvasRef.height/zoom(), offsetX(), 0, canvasRef.width, canvasRef.height);
             //  console.log("draw canvas");
-            }
+  //          }
         }
 
          // Crosshair at mouse
@@ -460,38 +461,57 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
       //  updateScroll(startTop + e.deltaY/10);
     };
 
-function addSlarLine(slar:any) : number
+function addSlarLine(data:any) : number
 {	
-	if (!slar || !backCtx) {
+	if (!data.slar || !backCtx) {
 		return -1;
 	}
 	
-    if (!slar.data) {
+    if (!data.slar.data) {
 		return -1;
 	}
-    if (!slar.data.pixels) {
+    if (!data.slar.data.pixels) {
 		return -1;
 	}
     //console.log("length: ", slar.data.pixels);
 	
     if(wfInsertPos < 0)
-        GrowCanvas(60*5); 
+        GrowCanvas(60*10); 
 
-	var line = atob(slar.data.line);	
+  if (!slarData) return -1;
+
+    // Create a LineDataHead with whatever values you want
+    const head: LineDataHead = {
+      nTime: Math.floor(Date.now() / 1000),
+      fLo: data.gnss.longitude,
+      fLa: data.gnss.latitude,
+      fHeading: data.fms.true_heading!.heading,
+      fScale: 60,
+      fAlt: data.gnss.altitude,
+      fSpeed: data.gnss.speed,
+      nState: 0n,
+      fSquintAngle: 0,
+    };
+
+    // push_front equivalent: add to the front; keep data EMPTY
+    slarData.lines = [{ head, data: new Uint8Array(0) }, ...slarData.lines];
+    slarData.lineCount = slarData.lines.length;
+
+	var line = atob(data.slar.data.line);	
     var img = backCtx.createImageData(line.length, 1);
-	var data = img.data;
+	var imgData = img.data;
 	for (let i = 0; i < line.length; i++) {
 		var value = line.charCodeAt(i);
-		data[4 * i] = value;
-		data[4 * i + 1] = value;
-		data[4 * i + 2] = value;
-		data[4 * i + 3] = 255;
+		imgData[4 * i] = value;
+		imgData[4 * i + 1] = value;
+		imgData[4 * i + 2] = value;
+		imgData[4 * i + 3] = 255;
 	}
 	for (let i = 1332; i < 1335; i++) {
-			data[4 * i] = 127;
-			data[4 * i + 1] = 255;
-			data[4 * i + 2] = 127;
-			data[4 * i + 3] = 224;		
+			imgData[4 * i] = 127;
+			imgData[4 * i + 1] = 255;
+			imgData[4 * i + 2] = 127;
+			imgData[4 * i + 3] = 224;		
 	}
 	backCtx.putImageData(img, 0, wfInsertPos);
     wfInsertPos--;
@@ -520,7 +540,7 @@ function addSlarLine(slar:any) : number
             const data = event.detail.data;
             //console.log("SDPStatusMessage");
             
-            if(addSlarLine(data.slar) >= 0)
+            if(addSlarLine(data) >= 0)
             {
               setContentHeight(contentHeight()+1);     
               if(scrollY() != 0)
@@ -659,21 +679,22 @@ const hexProper = () => {
 };
     //let timerId:number=0;
     onMount(() => {
-        img.onload = () => {
+
+        //img.onload = () => {
             lensCtx = lensCanvas.getContext("2d")!;
-            backCanvas.width = img.width;
-            backCanvas.height = img.height;
-            backCtx!.drawImage(img, 0, 0);
+            backCanvas.width = 2672;//img.width;
+            backCanvas.height = 1;
+           // backCtx!.drawImage(img, 0, 0);
 
             console.log("Image loaded via event.");
-            setContentHeight(img.height);  
-            setContentWidth(img.width);      
+            setContentHeight(1);  
+            setContentWidth(backCanvas.width);      
 
             CenterAtVert(0);
-            CenterAtHor(img.width/2-divWidth()/2);
+            CenterAtHor(backCanvas.width/2-divWidth()/2);
                      
             setupLensCanvas();           
-            DrawCanvas();
+            //DrawCanvas();
                      
             
             const url = new URL('../assets/slar/SLAR_10420003.dat', import.meta.url).href;
@@ -701,29 +722,31 @@ const hexProper = () => {
               backCanvas.height = imageData.height;
               setContentHeight(imageData.height);
               backCtx!.putImageData(imageData, 0, 0);
+              CenterAtHor(backCanvas.width/2-divWidth()/2);
               DrawCanvas();
             })();
 
+            const stockholm = { lat: 59.3293, lon: 18.0686 };
+            const london    = { lat: 51.5074, lon: -0.1278 };
 
-             //const canvas = document.getElementById("cv") as HTMLCanvasElement;
-            // drawDatToCanvas(canvasRef);
-            //requestAnimationFrame(step);
-          };
-     
+            const res = greatCircle(stockholm, london, { unit: "m" }); // nautical miles
+            console.log(`Distance: ${res.distance.toFixed(1)} m`);
+            console.log(`Initial bearing: ${res.initialBearing.toFixed(1)}°`);
+            console.log(`Final bearing: ${res.finalBearing.toFixed(1)}°`);
+
+    
           if(canvasRef!)
           {         
             window.addEventListener("keydown", onKeyDown);
             window.addEventListener("keyup", onKeyUp);
             canvasRef.addEventListener("pointermove", onPointerMove);
-            //canvasRef.addEventListener("mousedown", onMouseDown);
             canvasRef.addEventListener("pointerdown", onPointerDown);
             canvasRef.addEventListener("pointerup", onPointerUp);
             canvasRef.addEventListener("mouseenter", onEnter);
             canvasRef.addEventListener("mouseleave", onLeave);
             
           }
-        updateCanvasSize();
-        //  DrawCanvas();
+      //  updateCanvasSize();
         const ro = new ResizeObserver(() => {updateCanvasSize();setupLensCanvas();DrawCanvas();});
         if (divRef) {
             ro.observe(divRef);}
