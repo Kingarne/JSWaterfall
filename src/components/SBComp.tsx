@@ -8,7 +8,7 @@ import ScrollbarH from "./ScrollbarH";
 import { ParsedDat, readDatData  } from "./DatParser";
 import { linesToGrayscaleImageData } from "./DatParser";
 import { LineDataHead } from "./DatParser";
-import { greatCircle } from "./geo";
+import { greatCircle, destinationPoint } from "./geo";
 
 type RGBA = [number, number, number, number];
 type Point = { x: number; y: number };
@@ -33,6 +33,9 @@ const DEFAULT_HEAD: LineDataHead = {
   fSquintAngle: 0,
 };
 
+const slarLineW = 2672;
+const slarHalfW = slarLineW/2;
+
 export default function SBComp() 
 {
     let divRef: HTMLDivElement | undefined;        
@@ -52,6 +55,7 @@ export default function SBComp()
     let lensCtx!: CanvasRenderingContext2D;
 
     let slarData:ParsedDat;
+    let lut:LUT;
     //let metaData:LineDataHead;
 
     const [zoom, setZoom] = createSignal(1.0);
@@ -72,6 +76,8 @@ export default function SBComp()
     const [isTop, setIsTop] = createSignal(true);
     const [offsetX, setOffsetX] = createSignal(0);
     const [meta, setMeta] = createSignal<LineDataHead>(DEFAULT_HEAD);
+    const [enhance, setEnhance] = createSignal(false);
+   // const [lut, setLut] = createSignal<LUT>(IDENTITY_LUT);
     const [navJson, setNavJson] = createSignal<string>(
     JSON.stringify({
       lat: 59.3293,
@@ -179,7 +185,7 @@ export default function SBComp()
   
   }
 
-
+const cloneHead = (h: LineDataHead): LineDataHead => ({ ...h });
   const pick = (clientX: number, clientY: number) => {
     if(!canvasRef)
       return;
@@ -195,7 +201,13 @@ export default function SBComp()
     //console.log("lc: " + p.y);
     if(p.y < slarData.lineCount)
     {
-       setMeta(slarData.lines[p.y].head);  
+      const m = cloneHead(slarData.lines[p.y].head);      
+      const start = { lat: m.fLa, lon: m.fLo }; // Stockholm
+      const dist = Math.abs(p.x-slarHalfW)*60;
+      const dest = destinationPoint(start, m.fHeading, dist, { unit: "m" });       
+      m.fLa = dest.lat;
+      m.fLo = dest.lon;
+      setMeta(m);  
     }
     //  console.log(meta().fHeading);
     //  console.log(slarData.lines[p.y].head.fHeading);
@@ -371,17 +383,25 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
         let scrX = scrollX();
         let scrY = scrollY();
         if (backCtx ) {
-            // Sometimes, an image marked as complete may not have loaded correctly.
-//            if (img.naturalWidth !== 0) {
-              //console.log("Image is already loaded.");
-             // ctx.drawImage(backCanvas, 0, wfInsertPos+scrollY(), backCanvas.width, canvasRef.height, 0, 0, canvasRef.width, canvasRef.height);
-          //   const zoom = 1.0; 
-            
-             //console.log(contentWidth() + ", " + divWidth())
              ctx.drawImage(backCanvas, scrX/zoom(), wfInsertPos+scrY/zoom(), canvasRef.width/zoom(), canvasRef.height/zoom(), offsetX(), 0, canvasRef.width, canvasRef.height);
-            //  console.log("draw canvas");
-  //          }
+  
+        // 2) Apply LUT on the front canvas pixels
+        if(enhance())
+        {
+        console.log(canvasRef.width, canvasRef.height);
+        const img = ctx!.getImageData(offsetX(), 0, canvasRef.width-2*offsetX(), canvasRef.height);
+        const data = img.data; // Uint8ClampedArray [R,G,B,A, ...]
+        //const l = lut;
+        for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];//, g = data[i + 1], b = data[i + 2];
+        data[i]     = lut[r];//l[r];
+        data[i + 1] = lut[r];//l[g];
+        data[i + 2] = lut[r];//l[b]; 
+        // preserve alpha
         }
+        ctx!.putImageData(img, offsetX(), 0); 
+      }
+      }
 
          // Crosshair at mouse
     /*if (hover()) {
@@ -665,7 +685,31 @@ function CenterAtHor(center:number)
     setNewLeft(clampedTop);        
 }
 
+type LUT = Uint8Array & { length: 256 };
+function makeSigmoidContrastLUT(
+  amount = 1,
+  slope = 8,
+  midpoint = 0.5
+): LUT {
+  const a = Math.min(1, Math.max(0, amount));
+  const m = Math.min(1, Math.max(0, midpoint));
+  const s = Math.max(0.0001, slope);
 
+  // Normalize the logistic so x=0 → 0 and x=1 → 1
+  const sig = (x: number) => 1 / (1 + Math.exp(-s * (x - m)));
+  const y0 = sig(0);
+  const y1 = sig(1);
+  const norm = (y: number) => (y - y0) / (y1 - y0);
+
+  const lut = new Uint8Array(256) as LUT;
+  for (let i = 0; i < 256; i++) {
+    const x = i / 255;
+    const y = norm(sig(x));            // pure S-curve in [0,1]
+    const mix = (1 - a) * x + a * y;   // blend with identity
+    lut[i] = Math.max(0, Math.min(255, Math.round(mix * 255)));
+  }
+  return lut;
+}
 
 function step(timestamp:DOMHighResTimeStamp) {
 // console.log(timestamp);
@@ -694,6 +738,7 @@ const hexProper = () => {
             CenterAtHor(backCanvas.width/2-divWidth()/2);
                      
             setupLensCanvas();           
+            lut = makeSigmoidContrastLUT(1, 8, 0.5); // amount=1, slope=8, midpoint=0.5
             //DrawCanvas();
                      
             
@@ -868,8 +913,12 @@ const hexProper = () => {
         onChange={({ enabled, value }) => {
         // apply settings to your app here
         // e.g., toggle a feature, adjust intensity from slider
+          setEnhance(enabled);
+          lut = makeSigmoidContrastLUT(1, value, 0.5); // amount=1, slope=8, midpoint=0.5
+          DrawCanvas();
+          console.log(enabled,  value);
         }}
-        initialEnabled={true}
+        initialEnabled={false}
         initialValue={10}
       />
       <NavOverlay json={navJson()} latLonFormat="dec" units={{ speed: "kn", altitude: "m" }} />

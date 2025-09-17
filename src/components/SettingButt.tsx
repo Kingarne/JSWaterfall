@@ -104,7 +104,7 @@ export default function SettingsOverlay(props: {
                 checked={enabled()}
                 onInput={(e) => setEnabled((e.currentTarget as HTMLInputElement).checked)}
               />
-              Enable feature
+              Contrast
             </label>
 
             <label style={{ display: "grid", gap: "6px" }}>
