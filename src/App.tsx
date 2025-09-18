@@ -12,8 +12,29 @@ const App: Component = () => {
 
   //var sdpSocket = new WebSocket("ws://10.71.3.112:1234");
   //var sdpSocket = new WebSocket("ws://localhost:1234");
-  var sdpSocket = new WebSocket("ws://" + window.location.hostname + ":1234");
+  var sdpWS:any;// = new WebSocket("ws://" + window.location.hostname + ":1234");
   
+  function connect()
+{
+	//ws = new WebSocket("wss://172.26.71.158:7681", "mywsprotocol");
+	sdpWS = new WebSocket("ws://" + window.location.hostname + ":1234");
+  //sdpWS = new WebSocket("ws://10.71.3.114:1234");
+	try {
+    sdpWS.onopen = function() {
+			console.log("Connected to sdp");
+      sdpWS.addEventListener("message", onSDPMessage);
+		};
+ 		
+		sdpWS.onclose = function() {
+      console.log("Close sdp connection");
+			setTimeout(function() {
+				connect();
+			}, 3000);
+		}
+	} catch(exception) {
+		alert("Error" + exception);
+	}
+}
   //let socket = new WebSocket("wss//stream.aisstream.io/v0/stream");
   /*let socket = new WebSocket("ws://localhost/v0/stream");
   
@@ -32,7 +53,8 @@ const App: Component = () => {
 	};*/
 
   onMount(() => {
-    sdpSocket.addEventListener("message", onSDPMessage);
+    connect()
+    
 
     
   });

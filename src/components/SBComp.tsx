@@ -30,11 +30,22 @@ const DEFAULT_HEAD: LineDataHead = {
   fAlt: 0,
   fSpeed: 0,
   nState: 0n,
-  fSquintAngle: 0,
+  fSquintAngle: 5,
 };
 
 const slarLineW = 2672;
 const slarHalfW = slarLineW/2;
+
+type LUT = Uint8Array & { length: 256 };
+/** Make a LUT from a mapper i→[0..255]. */
+export function makeLUT(map: (i: number) => number): LUT {
+  const u = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) u[i] = Math.max(0, Math.min(255, map(i))) | 0;
+  return u as LUT;
+}
+
+/** Identity LUT (no change). */
+export const IDENTITY_LUT = makeLUT(i => i);
 
 export default function SBComp() 
 {
@@ -55,9 +66,7 @@ export default function SBComp()
     let lensCtx!: CanvasRenderingContext2D;
 
     let slarData:ParsedDat;
-    let lut:LUT;
-    //let metaData:LineDataHead;
-
+   
     const [zoom, setZoom] = createSignal(1.0);
     const [newTop, setNewTop] = createSignal(0);
     const [newLeft, setNewLeft] = createSignal(0);
@@ -77,7 +86,7 @@ export default function SBComp()
     const [offsetX, setOffsetX] = createSignal(0);
     const [meta, setMeta] = createSignal<LineDataHead>(DEFAULT_HEAD);
     const [enhance, setEnhance] = createSignal(false);
-   // const [lut, setLut] = createSignal<LUT>(IDENTITY_LUT);
+    const [lut, setLut] = createSignal<LUT>(IDENTITY_LUT);
     const [navJson, setNavJson] = createSignal<string>(
     JSON.stringify({
       lat: 59.3293,
@@ -200,11 +209,14 @@ const cloneHead = (h: LineDataHead): LineDataHead => ({ ...h });
 
     //console.log("lc: " + p.y);
     if(p.y < slarData.lineCount)
-    {
-      const m = cloneHead(slarData.lines[p.y].head);      
+    {      
+      const m = cloneHead(slarData.lines[p.y].head); 
       const start = { lat: m.fLa, lon: m.fLo }; // Stockholm
-      const dist = Math.abs(p.x-slarHalfW)*60;
-      const dest = destinationPoint(start, m.fHeading, dist, { unit: "m" });       
+      const dist = p.x-slarHalfW;            
+      const ang = (dist > 0) ? 90-m.fSquintAngle: 270+m.fSquintAngle;
+      const dir = m.fHeading + ang;
+      const absDist = Math.abs(dist)*60;
+      const dest = destinationPoint(start, dir, absDist, { unit: "m" });       
       m.fLa = dest.lat;
       m.fLo = dest.lon;
       setMeta(m);  
@@ -391,12 +403,12 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
         console.log(canvasRef.width, canvasRef.height);
         const img = ctx!.getImageData(offsetX(), 0, canvasRef.width-2*offsetX(), canvasRef.height);
         const data = img.data; // Uint8ClampedArray [R,G,B,A, ...]
-        //const l = lut;
+        const l = lut();
         for (let i = 0; i < data.length; i += 4) {
         const r = data[i];//, g = data[i + 1], b = data[i + 2];
-        data[i]     = lut[r];//l[r];
-        data[i + 1] = lut[r];//l[g];
-        data[i + 2] = lut[r];//l[b]; 
+        data[i]     = l[r];//l[r];
+        data[i + 1] = l[r];//l[g];
+        data[i + 2] = l[r];//l[b]; 
         // preserve alpha
         }
         ctx!.putImageData(img, offsetX(), 0); 
@@ -685,7 +697,7 @@ function CenterAtHor(center:number)
     setNewLeft(clampedTop);        
 }
 
-type LUT = Uint8Array & { length: 256 };
+
 function makeSigmoidContrastLUT(
   amount = 1,
   slope = 8,
@@ -738,7 +750,7 @@ const hexProper = () => {
             CenterAtHor(backCanvas.width/2-divWidth()/2);
                      
             setupLensCanvas();           
-            lut = makeSigmoidContrastLUT(1, 8, 0.5); // amount=1, slope=8, midpoint=0.5
+            setLut(makeSigmoidContrastLUT(1, 8, 0.5)); // amount=1, slope=8, midpoint=0.5
             //DrawCanvas();
                      
             
@@ -914,8 +926,8 @@ const hexProper = () => {
         // apply settings to your app here
         // e.g., toggle a feature, adjust intensity from slider
           setEnhance(enabled);
-          lut = makeSigmoidContrastLUT(1, value, 0.5); // amount=1, slope=8, midpoint=0.5
-          DrawCanvas();
+          setLut(makeSigmoidContrastLUT(1, value, 0.5)); // amount=1, slope=8, midpoint=0.5
+          //DrawCanvas();
           console.log(enabled,  value);
         }}
         initialEnabled={false}
