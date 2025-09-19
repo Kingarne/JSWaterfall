@@ -80,7 +80,7 @@ const arrowStyle: JSX.CSSProperties = {
         }}> 
         <div style={{ display: 'flex', 'align-items': 'left', "flex-direction": "column", gap: '6px' }}>  
         <span class="jek" style={{ display: 'inline-block', width: '20px', height: '16px', 'border-radius': '3px', background: hexProper(), border: '1px solid rgba(255,255,255,0.2)' }} />
-        <span>{(() => { const {x,y}=props.p; const [r,g,b,a]=props.rgba; return `${pt()}, [${Math.round(x)}, ${Math.round(y)}] `; })()}</span>        
+        <span>{(() => { const {x,y}=props.p; const [r,g,b,a]=props.rgba; return `${pt()}, [${Math.round(x-1336)}, ${Math.round(y)}] `; })()}</span>        
         <span><span class="head">Lat: </span><span>{(() => { const v= props.meta.fLa.toFixed(5); return `${v}`; })()}</span><span class="head"> Lon: </span><span>{(() => { const v= props.meta.fLo.toFixed(5); return `${v}`; })()}</span></span>
         <span><span class="head">Alt: </span><span>{(() => { const h= props.meta.fAlt.toFixed(1); return `${h}`; })()}</span></span>        
         <span><span class="head">Speed: </span><span>{(() => { const h= props.meta.fSpeed.toFixed(1); return `${h}`; })()}</span></span>

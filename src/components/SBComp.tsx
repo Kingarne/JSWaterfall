@@ -511,7 +511,15 @@ const dpr = () => Math.max(1, window.devicePixelRatio || 1);
           ctx!.putImageData(img, offsetX(), 0);   
         }
        
+        let p = img2Cli(1336,0);
         
+        console.log(p.x);
+        ctx.strokeStyle = "#1fff1f5f";
+        ctx.lineWidth = 3; 
+        ctx.beginPath();
+        ctx.moveTo(p.x, 0);
+        ctx.lineTo(p.x, canvasRef.height);
+        ctx.stroke();
       
       }
 
@@ -639,12 +647,12 @@ function addSlarLine(data:any) : number
 		imgData[4 * i + 2] = value;
 		imgData[4 * i + 3] = 255;
 	}
-	for (let i = 1332; i < 1335; i++) {
+	/*for (let i = 1332; i < 1335; i++) {
 			imgData[4 * i] = 127;
 			imgData[4 * i + 1] = 255;
 			imgData[4 * i + 2] = 127;
 			imgData[4 * i + 3] = 224;		
-	}
+	}*/
 	backCtx.putImageData(img, 0, wfInsertPos);
     wfInsertPos--;
     return 0;
