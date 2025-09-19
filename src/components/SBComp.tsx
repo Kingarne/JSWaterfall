@@ -8,7 +8,8 @@ import ScrollbarH from "./ScrollbarH";
 import { ParsedDat, readDatData  } from "./DatParser";
 import { linesToGrayscaleImageData } from "./DatParser";
 import { LineDataHead } from "./DatParser";
-import { greatCircle, destinationPoint } from "./geo";
+import { greatCircle, destinationPoint, LatLon } from "./geo";
+import { DistBear } from "./InfoView";
 
 type RGBA = [number, number, number, number];
 type Point = { x: number; y: number };
@@ -21,6 +22,12 @@ type ZoomLensProps = {
   lensSize?: number;  // lens box size in CSS px (square)
   round?: boolean;    // make lens circular
 };
+
+const DEFAULT_DB: DistBear = {
+  dist: 0,
+  bear: 0,
+}
+
 const DEFAULT_HEAD: LineDataHead = {
   nTime: 0,
   fLo: 0,
@@ -37,15 +44,66 @@ const slarLineW = 2672;
 const slarHalfW = slarLineW/2;
 
 type LUT = Uint8Array & { length: 256 };
+type RGBALUT = { r: LUT; g: LUT; b: LUT };
+
 /** Make a LUT from a mapper i→[0..255]. */
-export function makeLUT(map: (i: number) => number): LUT {
+function makeLUT(map: (i: number) => number): LUT {
   const u = new Uint8Array(256);
   for (let i = 0; i < 256; i++) u[i] = Math.max(0, Math.min(255, map(i))) | 0;
   return u as LUT;
 }
 
 /** Identity LUT (no change). */
-export const IDENTITY_LUT = makeLUT(i => i);
+const IDENTITY_LUT = makeLUT(i => i);
+
+const Heatmap_LUT = makeHeatmapRGBLUT({ gamma: 1.0 });
+/** Interpolate colors between stops to build a 256-entry RGB LUT. */
+function makeHeatmapRGBLUT(opts?: {
+  /** Optional gamma to skew the scalar domain (1 = linear). */
+  gamma?: number;
+  /** Override color stops if you want a different palette. */
+  stops?: [pos: number, rgb: [number, number, number]][]; // pos in [0,1]
+}): RGBALUT {
+  const r = new Uint8Array(256) as LUT;
+  const g = new Uint8Array(256) as LUT;
+  const b = new Uint8Array(256) as LUT;
+
+  const stops =
+    opts?.stops ??
+    ([
+      [0.00, [0, 0, 0]],        // black (optional: use [0,0,32] for dark navy)
+      [0.15, [0, 0, 128]],      // dark blue
+      [0.35, [0, 255, 255]],    // cyan
+      [0.50, [0, 255, 0]],      // green
+      [0.70, [255, 255, 0]],    // yellow
+      [0.85, [255, 96, 0]],     // orange
+      [1.00, [255, 255, 255]],  // white (or [255,0,0] if you want to end at red)
+    ] as [number, [number, number, number]][]);
+
+  const gamma = Math.max(0.01, opts?.gamma ?? 1);
+
+  for (let i = 0; i < 256; i++) {
+    // scalar in [0,1] with optional gamma shaping
+    let x = i / 255;
+    x = Math.pow(x, gamma);
+
+    // find the two surrounding stops
+    let j = 0;
+    while (j < stops.length - 1 && x > stops[j + 1][0]) j++;
+    const [p0, c0] = stops[j];
+    const [p1, c1] = stops[Math.min(j + 1, stops.length - 1)];
+    const t = p1 > p0 ? (x - p0) / (p1 - p0) : 0;
+
+    // linear interpolate RGB
+    const R = Math.round((1 - t) * c0[0] + t * c1[0]);
+    const G = Math.round((1 - t) * c0[1] + t * c1[1]);
+    const B = Math.round((1 - t) * c0[2] + t * c1[2]);
+
+    r[i] = R; g[i] = G; b[i] = B;
+  }
+
+  return { r, g, b };
+}
 
 export default function SBComp() 
 {
@@ -67,6 +125,8 @@ export default function SBComp()
 
     let slarData:ParsedDat;
    
+    var comWS:any;
+  
     const [zoom, setZoom] = createSignal(1.0);
     const [newTop, setNewTop] = createSignal(0);
     const [newLeft, setNewLeft] = createSignal(0);
@@ -85,8 +145,10 @@ export default function SBComp()
     const [isTop, setIsTop] = createSignal(true);
     const [offsetX, setOffsetX] = createSignal(0);
     const [meta, setMeta] = createSignal<LineDataHead>(DEFAULT_HEAD);
-    const [enhance, setEnhance] = createSignal(false);
+    const [distBear, setDistBear] = createSignal<DistBear>(DEFAULT_DB);
+    const [enhance, setEnhance] = createSignal(0);
     const [lut, setLut] = createSignal<LUT>(IDENTITY_LUT);
+    const [RGBLut, setRGBLut] = createSignal<RGBALUT>(Heatmap_LUT);
     const [navJson, setNavJson] = createSignal<string>(
     JSON.stringify({
       lat: 59.3293,
@@ -170,8 +232,8 @@ export default function SBComp()
   dy = Math.min(canvasRef.height - 1, Math.max(0, Math.floor(dy)));
 
   // device px → client (CSS) px
-  const cliX = dx / dpr() + offsetX();
-  const cliY = dy / dpr();
+  const cliX = dx  + offsetX();
+  const cliY = dy ;
 
   
   return { x: cliX, y: cliY };
@@ -181,8 +243,8 @@ export default function SBComp()
     if(!canvasRef)
       return { x: (0), y: (0) };
 
-    let ix = scrollX() + Math.min(canvasRef.width - 1, Math.max(0, Math.floor(cliX * dpr())));
-    let iy = scrollY() + Math.min(canvasRef.height - 1, Math.max(0, Math.floor(cliY * dpr())));
+    let ix = scrollX() + Math.min(canvasRef.width - 1, Math.max(0, Math.floor(cliX )));
+    let iy = scrollY() + Math.min(canvasRef.height - 1, Math.max(0, Math.floor(cliY )));
     ix = ix-offsetX();
 
     ix = ix/zoom();
@@ -211,7 +273,7 @@ const cloneHead = (h: LineDataHead): LineDataHead => ({ ...h });
     if(p.y < slarData.lineCount)
     {      
       const m = cloneHead(slarData.lines[p.y].head); 
-      const start = { lat: m.fLa, lon: m.fLo }; // Stockholm
+      const start = { lat: m.fLa, lon: m.fLo }; 
       const dist = p.x-slarHalfW;            
       const ang = (dist > 0) ? 90-m.fSquintAngle: 270+m.fSquintAngle;
       const dir = m.fHeading + ang;
@@ -220,7 +282,22 @@ const cloneHead = (h: LineDataHead): LineDataHead => ({ ...h });
       m.fLa = dest.lat;
       m.fLo = dest.lon;
       setMeta(m);  
+
+
+      //console.log(navJson());
+      let o = JSON.parse(navJson() ?? "{}");// as Record<string, unknown>;
+      //console.log(o);
+      const AC:LatLon = { lat: o.lat, lon: o.lon };
+      
+      const res = greatCircle(AC, dest, { unit: "nm" }); // nautical miles
+      //console.log(`Distance: ${res.distance.toFixed(1)} m`);
+      //console.log(`Initial bearing: ${res.initialBearing.toFixed(1)}°`);
+      //console.log(`Final bearing: ${res.finalBearing.toFixed(1)}°`);
+
+      setDistBear({dist:res.distance, bear:res.initialBearing});
+
     }
+    //bc.postMessage({ type: 'hello', t: Date.now() });
     //  console.log(meta().fHeading);
     //  console.log(slarData.lines[p.y].head.fHeading);
 
@@ -374,7 +451,7 @@ function drawLensAt(clientX: number, clientY: number) {
     };
 
   const onLeave = () => { setHover(false); DrawCanvas(); };
-const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
+const dpr = () => Math.max(1, window.devicePixelRatio || 1);
 
     const DrawCanvas = () => {
         if(!canvasRef)
@@ -398,21 +475,44 @@ const dpr = () => 1 ;// Math.max(1, window.devicePixelRatio || 1);
              ctx.drawImage(backCanvas, scrX/zoom(), wfInsertPos+scrY/zoom(), canvasRef.width/zoom(), canvasRef.height/zoom(), offsetX(), 0, canvasRef.width, canvasRef.height);
   
         // 2) Apply LUT on the front canvas pixels
-        if(enhance())
+        if(enhance() == 1)
         {
-        console.log(canvasRef.width, canvasRef.height);
-        const img = ctx!.getImageData(offsetX(), 0, canvasRef.width-2*offsetX(), canvasRef.height);
-        const data = img.data; // Uint8ClampedArray [R,G,B,A, ...]
-        const l = lut();
-        for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];//, g = data[i + 1], b = data[i + 2];
-        data[i]     = l[r];//l[r];
-        data[i + 1] = l[r];//l[g];
-        data[i + 2] = l[r];//l[b]; 
-        // preserve alpha
+          console.log(canvasRef.width, canvasRef.height);
+          const img = ctx!.getImageData(offsetX(), 0, canvasRef.width-2*offsetX(), canvasRef.height);
+          const data = img.data; // Uint8ClampedArray [R,G,B,A, ...]
+          //const l = lut();
+          const lr = RGBLut().r;
+          const lg = RGBLut().g;
+          const lb = RGBLut().b;
+          
+          for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];//, g = data[i + 1], b = data[i + 2];
+          data[i]     = lr[r];//l[r];
+          data[i + 1] = lg[r];//l[g];
+          data[i + 2] = lb[r];//l[b]; 
+          // preserve alpha          
+          }
+          ctx!.putImageData(img, offsetX(), 0);   
         }
-        ctx!.putImageData(img, offsetX(), 0); 
-      }
+        else if(enhance() == 2)
+        {
+          console.log(canvasRef.width, canvasRef.height);
+          const img = ctx!.getImageData(offsetX(), 0, canvasRef.width-2*offsetX(), canvasRef.height);
+          const data = img.data; // Uint8ClampedArray [R,G,B,A, ...]
+          const l = lut();
+          
+          for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];//, g = data[i + 1], b = data[i + 2];
+          data[i]     = l[r];
+          data[i + 1] = l[r];
+          data[i + 2] = l[r]; 
+          // preserve alpha          
+          }
+          ctx!.putImageData(img, offsetX(), 0);   
+        }
+       
+        
+      
       }
 
          // Crosshair at mouse
@@ -676,7 +776,7 @@ function CenterAtVert(center:number)
 }
 
 function setupLensCanvas() {
-    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const dpr = 1;//Math.max(1, window.devicePixelRatio || 1);
     lensCanvas.style.width = `${lensSize}px`;
     lensCanvas.style.height = `${lensSize}px`;
     lensCanvas.width = Math.round(lensSize * dpr);
@@ -722,6 +822,38 @@ function makeSigmoidContrastLUT(
   }
   return lut;
 }
+
+
+
+  function onComMessage(event: MessageEvent)
+  {
+    //TODO Verify Event Data is ACTUALLY a SDPMessage!!
+    const data = JSON.parse(event.data);
+    console.log(data);
+  }
+
+function ConnectToPage()
+{
+  try {
+        comWS.onopen = function() {
+          console.log("Connected to page");
+          comWS.addEventListener("message", onComMessage);
+        };
+        
+        comWS.onclose = function() {
+          console.log("Close page connection");
+          setTimeout(function() {
+            ConnectToPage();
+          }, 3000);
+        }
+      } catch(exception) {
+        alert("Error" + exception);
+    }
+    
+}
+  
+
+let bc:any;
 
 function step(timestamp:DOMHighResTimeStamp) {
 // console.log(timestamp);
@@ -809,6 +941,16 @@ const hexProper = () => {
             ro.observe(divRef);}
 
         document.addEventListener("mssevent", HandleMssEvent as EventListener);  
+
+          
+	    bc = new BroadcastChannel("test_channel");
+      bc.onmessage = (event: MessageEvent) => {
+        if(event)
+        console.log("BroadcastChannel: ");
+        console.log(event);
+      };
+      bc.postMessage({ type: 'hello', t: Date.now() });
+
     });
   
     createMemo(() => {
@@ -917,16 +1059,20 @@ const hexProper = () => {
           rgba={rgba()}
           p={imgPos()}
           meta={meta()}
+          distBear={distBear()}
           //rgba = {rgba()}
         //  text = "hej2"
       />
       
       <SettingsOverlay
-        onChange={({ enabled, value }) => {
+        onChange={({ enabled, enabledHM, value }) => {
         // apply settings to your app here
         // e.g., toggle a feature, adjust intensity from slider
-          setEnhance(enabled);
+        
+          setEnhance(enabledHM ? 1 : enabled ? 2 : 0 );
+          
           setLut(makeSigmoidContrastLUT(1, value, 0.5)); // amount=1, slope=8, midpoint=0.5
+          setRGBLut(makeHeatmapRGBLUT({ gamma: value/10 }));
           //DrawCanvas();
           console.log(enabled,  value);
         }}

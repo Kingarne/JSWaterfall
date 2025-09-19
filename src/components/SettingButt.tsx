@@ -1,18 +1,20 @@
 // SettingsOverlay.tsx
 import { createSignal, createEffect, onMount, onCleanup } from "solid-js";
 
-type Settings = { enabled: boolean; value: number };
+type Settings = { enabled: boolean; enabledHM: boolean; value: number };
 
 export default function SettingsOverlay(props: {
   onChange?: (s: Settings) => void;
   initialEnabled?: boolean;
+  initialHMEnabled?: boolean;
   initialValue?: number;
 }) {
   const [open, setOpen] = createSignal(false);
   const [enabled, setEnabled] = createSignal(props.initialEnabled ?? false);
+  const [enabledHM, setEnabledHM] = createSignal(props.initialHMEnabled ?? false);
   const [value, setValue] = createSignal(props.initialValue ?? 50);
 
-  createEffect(() => props.onChange?.({ enabled: enabled(), value: value() }));
+  createEffect(() => props.onChange?.({ enabled: enabled(), enabledHM: enabledHM(), value: value() }));
 
   // ESC closes
   onMount(() => {
@@ -98,6 +100,14 @@ export default function SettingsOverlay(props: {
           style={panelStyle()}
         >
           <div style={{ display: "grid", gap: "10px" }}>
+              <label style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={enabledHM()}
+                onInput={(e) => setEnabledHM((e.currentTarget as HTMLInputElement).checked)}
+              />
+              Heatmap
+            </label>
             <label style={{ display: "flex", gap: "8px", alignItems: "center" }}>
               <input
                 type="checkbox"
@@ -105,7 +115,7 @@ export default function SettingsOverlay(props: {
                 onInput={(e) => setEnabled((e.currentTarget as HTMLInputElement).checked)}
               />
               Contrast
-            </label>
+            </label>           
 
             <label style={{ display: "grid", gap: "6px" }}>
               <span>Intensity: {value()}</span>
