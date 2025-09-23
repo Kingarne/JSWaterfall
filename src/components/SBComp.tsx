@@ -172,7 +172,7 @@ export default function SBComp()
   let startScrollX = 0;
   let startScrollY = 0;
 
-  let lastNavTime = 0;          // timestamp of last setNav
+  let lastNavTime = 0;          // timestamp of last setNav  
 
   const updateOverlayPos = () => {
     if (!canvasRef) return;
@@ -294,10 +294,15 @@ const cloneHead = (h: LineDataHead): LineDataHead => ({ ...h });
       //console.log(`Initial bearing: ${res.initialBearing.toFixed(1)}°`);
       //console.log(`Final bearing: ${res.finalBearing.toFixed(1)}°`);
 
-      setDistBear({dist:res.distance, bear:res.initialBearing});
+      setDistBear({dist:res.distance, bear:res.initialBearing});      
+      const pos = {la:m.fLa, lo:m.fLo, t: Date.now()};
+      //bc.postMessage({ type: 'hello', t: Date.now() });
+      //bc.postMessage(JSON.stringify(pos));//){ pos: 'hello', t: Date.now() });
+      bc.postMessage(pos);
 
     }
-    //bc.postMessage({ type: 'hello', t: Date.now() });
+
+    
     //  console.log(meta().fHeading);
     //  console.log(slarData.lines[p.y].head.fHeading);
 
@@ -477,7 +482,7 @@ const dpr = () => Math.max(1, window.devicePixelRatio || 1);
         // 2) Apply LUT on the front canvas pixels
         if(enhance() == 1)
         {
-          console.log(canvasRef.width, canvasRef.height);
+         // console.log(canvasRef.width, canvasRef.height);
           const img = ctx!.getImageData(offsetX(), 0, canvasRef.width-2*offsetX(), canvasRef.height);
           const data = img.data; // Uint8ClampedArray [R,G,B,A, ...]
           //const l = lut();
@@ -496,7 +501,7 @@ const dpr = () => Math.max(1, window.devicePixelRatio || 1);
         }
         else if(enhance() == 2)
         {
-          console.log(canvasRef.width, canvasRef.height);
+          //(canvasRef.width, canvasRef.height);
           const img = ctx!.getImageData(offsetX(), 0, canvasRef.width-2*offsetX(), canvasRef.height);
           const data = img.data; // Uint8ClampedArray [R,G,B,A, ...]
           const l = lut();
@@ -513,7 +518,7 @@ const dpr = () => Math.max(1, window.devicePixelRatio || 1);
        
         let p = img2Cli(1336,0);
         
-        console.log(p.x);
+       // console.log(p.x);
         ctx.strokeStyle = "#1fff1f5f";
         ctx.lineWidth = 3; 
         ctx.beginPath();
@@ -932,6 +937,17 @@ const hexProper = () => {
             console.log(`Final bearing: ${res.finalBearing.toFixed(1)}°`);
 
     
+            const id = crypto.randomUUID();
+            bc = new BroadcastChannel('slar-meta');
+
+            bc.onmessage = (e) => {
+              //if (e.data?.from === id) return; // ignore self
+              //console.log('Got:', e.data);
+            };
+
+            // send something
+            //bc.postMessage({ from: id, text: 'hello from ' + location.pathname });
+
           if(canvasRef!)
           {         
             window.addEventListener("keydown", onKeyDown);
@@ -950,14 +966,7 @@ const hexProper = () => {
 
         document.addEventListener("mssevent", HandleMssEvent as EventListener);  
 
-          
-	    bc = new BroadcastChannel("test_channel");
-      bc.onmessage = (event: MessageEvent) => {
-        if(event)
-        console.log("BroadcastChannel: ");
-        console.log(event);
-      };
-      bc.postMessage({ type: 'hello', t: Date.now() });
+       
 
     });
   
