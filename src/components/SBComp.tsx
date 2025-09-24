@@ -5,7 +5,7 @@ import SettingsOverlay from "./SettingButt";
 import NavOverlay from "./NavOverlay";
 import ScrollbarV from "./ScrollbarV";
 import ScrollbarH from "./ScrollbarH";
-import { ParsedDat, readDatData  } from "./DatParser";
+import { ParsedDat, readDatData, LineDataInfo, LineData  } from "./DatParser";
 import { linesToGrayscaleImageData } from "./DatParser";
 import { LineDataHead } from "./DatParser";
 import { greatCircle, destinationPoint, LatLon } from "./geo";
@@ -124,10 +124,20 @@ export default function SBComp()
     let lensDiv!: HTMLDivElement;       // floating lens container
     let lensCtx!: CanvasRenderingContext2D;
 
-    let slarData:ParsedDat;
+    const INITIAL_PARSED_DAT: ParsedDat = {
+  info: {} as LineDataInfo, // TODO: put your real defaults here
+  imgWidth: 0,
+  eLineType: 0,
+  lineLength: 0,
+  lineCount: 0,
+  lines: [] as LineData[], // reversed order (push_front style)
+};
+    let slarData:ParsedDat = INITIAL_PARSED_DAT;
    
     var comWS:any;
   
+    //let wfInsertPos:number=-1;
+    const [insertPos, setInsertPos] = createSignal(-1);
     const [zoom, setZoom] = createSignal(1.0);
     const [newTop, setNewTop] = createSignal(0);
     const [newLeft, setNewLeft] = createSignal(0);
@@ -187,9 +197,9 @@ export default function SBComp()
     
     let backCanvas = document.createElement('canvas');
     let backCtx = backCanvas.getContext('2d', { willReadFrequently: true } );     
-    let wfInsertPos:number=-1;
+    //let wfInsertPos:number=-1;
 
-    //const canvasHeight = 1200;
+    //const canvasHeight = 1200;d
     //let viewportHeight = 600;
 
     const updateCanvasSize = () => {
@@ -213,7 +223,7 @@ export default function SBComp()
     return { x: (e.clientX - r.left), y: (e.clientY - r.top) };
   };
 
-const InvY = (y:number):number => {return (backCanvas.height-wfInsertPos)-y;}
+const InvY = (y:number):number => {return (backCanvas.height-insertPos())-y;}
 
   const img2Cli = (imgX: number, imgY: number, fromTop:boolean=true) => {
   if (!canvasRef)
@@ -281,19 +291,19 @@ const img2Geo = (x:number, y:number):LatLon => {
 const cloneHead = (h: LineDataHead): LineDataHead => ({ ...h });
 
   const pick = (clientX: number, clientY: number) => {
-    if(!canvasRef)
+    if(!canvasRef)// || slarData === undefined || slarData.lineCount === undefined)
       return;
 
     const p = cli2Img(clientX, clientY);
     setCliPos({x:clientX, y:clientY});
    
-    const data = backCtx!.getImageData(p.x, p.y+wfInsertPos, 1, 1).data;
+    const data = backCtx!.getImageData(p.x, p.y+insertPos(), 1, 1).data;
 
     setImgPos({x:p.x, y:p.y});
     setRgba([data[0], data[1], data[2], data[3]]);
 
     //console.log("lc: " + p.y);
-    if(p.y < slarData.lineCount)
+    if(p.y < slarData!.lineCount)
     {      
       const m = cloneHead(slarData.lines[p.y].head); 
      /* const start = { lat: m.fLa, lon: m.fLo }; 
@@ -322,11 +332,16 @@ const cloneHead = (h: LineDataHead): LineDataHead => ({ ...h });
       //console.log(`Final bearing: ${res.finalBearing.toFixed(1)}°`);
 
       setDistBear({dist:res.distance, bear:res.initialBearing});      
-      const pos = {la:m.fLa, lo:m.fLo, t: Date.now()};
+     
       //bc.postMessage({ type: 'hello', t: Date.now() });
       //bc.postMessage(JSON.stringify(pos));//){ pos: 'hello', t: Date.now() });
-      bc.postMessage(pos);
-
+      if(hover())
+      {
+        const cm = keyHeld() === "c" ? 1 : 0;
+        const pos = {cmd: cm, la:m.fLa, lo:m.fLo, t: Date.now()};
+        console.log(pos);
+        bc.postMessage(pos);
+      }
     }
 
     
@@ -378,7 +393,7 @@ function drawLensAt(clientX: number, clientY: number) {
    // lensCtx.save();
     lensCtx.imageSmoothingEnabled = false;
 
-    lensCtx.drawImage(backCanvas, sx, wfInsertPos+sy, srcW, srcH, 0, 0, lensSize, lensSize);
+    lensCtx.drawImage(backCanvas, sx, insertPos() + sy, srcW, srcH, 0, 0, lensSize, lensSize);
    // lensCtx.restore();
     // Optional crosshair
     lensCtx.strokeStyle = "rgba(219, 43, 43, 0.6)";
@@ -593,7 +608,7 @@ console.log("draw canvas");
         let scrX = scrollX();
         let scrY = scrollY();
         if (backCtx ) {
-             ctx.drawImage(backCanvas, scrX/zoom(), wfInsertPos+scrY/zoom(), canvasRef.width/zoom(), canvasRef.height/zoom(), offsetX(), 0, canvasRef.width, canvasRef.height);
+             ctx.drawImage(backCanvas, scrX/zoom(), insertPos()+scrY/zoom(), canvasRef.width/zoom(), canvasRef.height/zoom(), offsetX(), 0, canvasRef.width, canvasRef.height);
   
         // 2) Apply LUT on the front canvas pixels
         if(enhance() == 1)
@@ -737,7 +752,7 @@ function addSlarLine(data:any) : number
 	}
     //console.log("length: ", slar.data.pixels);
 	
-    if(wfInsertPos < 0)
+    if(insertPos() < 0)
         GrowCanvas(60*10); 
 
   if (!slarData) return -1;
@@ -775,8 +790,8 @@ function addSlarLine(data:any) : number
 			imgData[4 * i + 2] = 127;
 			imgData[4 * i + 3] = 224;		
 	}*/
-	backCtx.putImageData(img, 0, wfInsertPos);
-    wfInsertPos--;
+	backCtx.putImageData(img, 0, insertPos());
+    setInsertPos(insertPos()-1);    
     return 0;
     }
 
@@ -790,7 +805,7 @@ function addSlarLine(data:any) : number
         newCanvas.width = backCanvas.width;
         newCanvas.height = backCanvas.height + grow; // extra rows   
         newCtx!.drawImage(backCanvas, 0, grow);
-        wfInsertPos = grow-1;
+        setInsertPos(grow-1);
         backCanvas = newCanvas;
         backCtx = backCanvas.getContext('2d',  { willReadFrequently: true });    
     }    
@@ -808,7 +823,7 @@ function addSlarLine(data:any) : number
               if(scrollY() != 0)
                 setScrollY(scrollY()+zoom());         
               DrawCanvas();
-              //pick(100,100);
+              pick(cliPos().x,cliPos().y);
             }
 
             if(Date.now()-lastNavTime > 500)
@@ -1118,7 +1133,8 @@ const hexProper = () => {
         // canvasRef.style.transform = `translateY(-${scrollY()}px)`;
      // }
     });
-  
+
+   
   const lensStyle: Partial<CSSStyleDeclaration> = {
     position: "fixed",                 // follows the page cursor
     left: "0px",
