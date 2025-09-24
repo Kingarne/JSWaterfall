@@ -130,3 +130,9 @@ body {
   color: var(--head);
  /* visibility: hidden;*/
 }
+  
+/* Both canvases overlap exactly and scale with window */
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* Overlay is fully transparent to input */
+#OLCanv { pointer-events: none; }  /* <- mouse goes through */

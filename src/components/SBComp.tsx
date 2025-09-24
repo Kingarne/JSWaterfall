@@ -112,6 +112,7 @@ export default function SBComp()
     let scHRef: HTMLDivElement;        
     let infoV: HTMLDivElement;        
     let canvasRef: HTMLCanvasElement;
+    let OLCanvRef: HTMLCanvasElement;    
     let overlay!: HTMLDivElement;
     let ro: ResizeObserver | undefined;
 
@@ -140,7 +141,7 @@ export default function SBComp()
     const [cliPos, setCliPos] = createSignal({ x: 0, y: 0 });
     const [hover, setHover] = createSignal(false);    
     const [rgba, setRgba] = createSignal<RGBA>([0,0,0,255]);
-    const [zHeld, setZHeld] = createSignal(false);
+    const [keyHeld, setKeyHeld] = createSignal('');
     const [cliCenter, setCliCenter] = createSignal(100);
     const [isTop, setIsTop] = createSignal(true);
     const [offsetX, setOffsetX] = createSignal(0);
@@ -149,16 +150,10 @@ export default function SBComp()
     const [enhance, setEnhance] = createSignal(0);
     const [lut, setLut] = createSignal<LUT>(IDENTITY_LUT);
     const [RGBLut, setRGBLut] = createSignal<RGBALUT>(Heatmap_LUT);
-    const [navJson, setNavJson] = createSignal<string>(
-    JSON.stringify({
-      lat: 59.3293,
-      lon: 18.0686,
-      speed: 14.2,        // knots
-      heading: 72,        // degrees
-      alt: 120,           // meters
-      time: new Date().toISOString(),
-    })
-  );
+    const [navJson, setNavJson] = createSignal<string>( JSON.stringify({lat: 59.3293, lon: 18.0686, speed: 14.2, /*knots*/ heading: 72, /*degrees*/ alt: 120, /* meters*/ time: new Date().toISOString() }));
+    const [DBPos1, setDBPos1] = createSignal({x:-1, y:-1});  
+    const [DBPos2, setDBPos2] = createSignal({x:-1, y:-1});  
+  
   
     const css = () => {
       const [r, g, b, a] = rgba();
@@ -198,12 +193,14 @@ export default function SBComp()
     //let viewportHeight = 600;
 
     const updateCanvasSize = () => {
-        if (divRef && canvasRef) {
+        if (divRef && canvasRef && OLCanvRef) {
           // Get the parent element's current size.
           const { clientWidth, clientHeight } = divRef;
           // Update the canvas's drawing buffer size.
           canvasRef.width = clientWidth;
           canvasRef.height = clientHeight;
+          OLCanvRef.width = clientWidth;
+          OLCanvRef.height = clientHeight;
           setDivHeight(clientHeight);
           setDivWidth(clientWidth);
           
@@ -216,13 +213,16 @@ export default function SBComp()
     return { x: (e.clientX - r.left), y: (e.clientY - r.top) };
   };
 
+const InvY = (y:number):number => {return (backCanvas.height-wfInsertPos)-y;}
 
-
-  const img2Cli = (imgX: number, imgY: number) => {
+  const img2Cli = (imgX: number, imgY: number, fromTop:boolean=true) => {
   if (!canvasRef)
     return { x: 0, y: 0 };
 
-  // image → device pixels inside the canvas
+  // image → device pixels inside the canvast
+  if(!fromTop){
+    imgY = InvY(imgY);
+  }
   // (apply zoom, then remove scroll)
   let dx = imgX * zoom() - scrollX();
   let dy = imgY * zoom() - scrollY();
@@ -239,7 +239,7 @@ export default function SBComp()
   return { x: cliX, y: cliY };
 };
   
-  const cli2Img = (cliX: number, cliY: number) => {
+  const cli2Img = (cliX: number, cliY: number, fromTop:boolean=true) => {
     if(!canvasRef)
       return { x: (0), y: (0) };
 
@@ -249,6 +249,9 @@ export default function SBComp()
 
     ix = ix/zoom();
     iy = iy/zoom();
+    if(!fromTop){
+      iy = InvY(iy);
+    }
    //z iy = iy+wfInsertPos;
   //console.log("p:" + ix + "," + iy);
 
@@ -256,7 +259,27 @@ export default function SBComp()
   
   }
 
+const img2Geo = (x:number, y:number):LatLon => {
+
+  if(y >= slarData.lineCount)
+    return {lat:0, lon:0};
+          
+  //const m = cloneHead(slarDatda.lines[y].head); 
+  const m = slarData.lines[y].head; 
+  const start = { lat: m.fLa, lon: m.fLo }; 
+  const dist = x-slarHalfW;            
+  const ang = (dist > 0) ? 90-m.fSquintAngle: 270+m.fSquintAngle;
+  const dir = m.fHeading + ang;
+  const absDist = Math.abs(dist)*60;
+  const dest = destinationPoint(start, dir, absDist, { unit: "m" });       
+  //m.fLa = dest.lat;
+  //m.fLo = dest.lon;
+    
+  return {lat:dest.lat, lon:dest.lon}
+}
+
 const cloneHead = (h: LineDataHead): LineDataHead => ({ ...h });
+
   const pick = (clientX: number, clientY: number) => {
     if(!canvasRef)
       return;
@@ -273,14 +296,18 @@ const cloneHead = (h: LineDataHead): LineDataHead => ({ ...h });
     if(p.y < slarData.lineCount)
     {      
       const m = cloneHead(slarData.lines[p.y].head); 
-      const start = { lat: m.fLa, lon: m.fLo }; 
+     /* const start = { lat: m.fLa, lon: m.fLo }; 
       const dist = p.x-slarHalfW;            
       const ang = (dist > 0) ? 90-m.fSquintAngle: 270+m.fSquintAngle;
       const dir = m.fHeading + ang;
       const absDist = Math.abs(dist)*60;
       const dest = destinationPoint(start, dir, absDist, { unit: "m" });       
       m.fLa = dest.lat;
-      m.fLo = dest.lon;
+      m.fLo = dest.lon;*/
+
+      const geo = img2Geo(p.x, p.y);
+      m.fLa = geo.lat;
+      m.fLo = geo.lon;
       setMeta(m);  
 
 
@@ -289,7 +316,7 @@ const cloneHead = (h: LineDataHead): LineDataHead => ({ ...h });
       //console.log(o);
       const AC:LatLon = { lat: o.lat, lon: o.lon };
       
-      const res = greatCircle(AC, dest, { unit: "nm" }); // nautical miles
+      const res = greatCircle(AC, geo, { unit: "nm" }); // nautical miles
       //console.log(`Distance: ${res.distance.toFixed(1)} m`);
       //console.log(`Initial bearing: ${res.initialBearing.toFixed(1)}°`);
       //console.log(`Final bearing: ${res.finalBearing.toFixed(1)}°`);
@@ -309,7 +336,7 @@ const cloneHead = (h: LineDataHead): LineDataHead => ({ ...h });
   };
 
 function drawLensAt(clientX: number, clientY: number) {
-    if (!zHeld()) return;
+    if (keyHeld() !== 'z') return;
 
     // Position lens near the cursor
     const pad = 5; // offset from cursor
@@ -369,9 +396,19 @@ function drawLensAt(clientX: number, clientY: number) {
     //const p = toLocal(e);
     pick(e.clientX, e.clientY);
     
-    if (hover() && zHeld()) {
+    if (hover() && keyHeld() === 'z') {
+        console.log("draw lens");
         lensDiv.style.opacity = "1";
         drawLensAt(e.clientX, e.clientY);
+        return;
+      }
+
+      if(hover() && keyHeld() === "d")
+      {
+        const p= cli2Img(e.clientX, e.clientY, false);
+        setDBPos2({x:p.x, y:p.y});
+        //console.log("create target");
+        //console.log(DBPos2());
         return;
       }
 
@@ -382,6 +419,7 @@ function drawLensAt(clientX: number, clientY: number) {
         canvasRef.style.cursor = "crosshair";
         return;
       }
+
 
       const dx = e.clientX - dragStartX;
       const dy = e.clientY - dragStartY;
@@ -414,6 +452,14 @@ function drawLensAt(clientX: number, clientY: number) {
       startScrollY = scrollY();
       canvasRef.style.cursor = "grabbing";
 
+      if(keyHeld() === "d")
+      {
+        const p= cli2Img(e.clientX, e.clientY, false);
+        setDBPos1({x:p.x, y:p.y});
+        //console.log("create target");
+        //console.log(DBPos1());
+
+      }
      //CenterAtImg(imgPos().x, imgPos().y);     
 
    // console.log("down:", imgPos().y)
@@ -427,7 +473,7 @@ function drawLensAt(clientX: number, clientY: number) {
   const onEnter = (e: MouseEvent) => { 
     console.log("onEnter");
     setHover(true); 
-    if (zHeld()) lensDiv.style.opacity = "1";  
+    if (keyHeld() === 'z') lensDiv.style.opacity = "1";  
     pick(e.clientX, e.clientY); 
     DrawCanvas(); 
   };
@@ -435,33 +481,103 @@ function drawLensAt(clientX: number, clientY: number) {
    // Hold 'm' to show lens
     const onKeyDown = (e: KeyboardEvent) => {
       
-      if (e.key.toLowerCase() === "z") {
-        if (!zHeld()) {
-          setZHeld(true);        
-          if (hover()) {
+      //if (e.key.toLowerCase() === "z") {
+        if (keyHeld() !== e.key.toLowerCase()) {
+          setKeyHeld(e.key.toLowerCase());        
+          
+          if (hover() && e.key.toLowerCase() === "z") {
             console.log("onKeyDown");
             lensDiv.style.opacity = "1";
             const m = cliPos();
             drawLensAt(m.x, m.y);
           }
         }
-      }
+      //}
     };
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === "z") {
-        console.log("onKeyUp");
-        setZHeld(false);
+        console.log("onKeyUp");      
         lensDiv.style.opacity = "0";
       }
+       
+      if (e.key.toLowerCase() === "d") {        
+        setDBPos1({x:-1, y:-1});
+      }
+      setKeyHeld('');
     };
 
   const onLeave = () => { setHover(false); DrawCanvas(); };
-const dpr = () => Math.max(1, window.devicePixelRatio || 1);
+  const dpr = () => Math.max(1, window.devicePixelRatio || 1);
+
+// --- Transparent overlay drawing (no background fill) ---
+  const DrawOverlay = () => {
+     const ctx = OLCanvRef!.getContext('2d', { willReadFrequently: true });
+    console.log("draw overlay");
+     if(!ctx)
+      return;
+
+    
+    const w = OLCanvRef!.clientWidth, h = OLCanvRef!.clientHeight;
+    ctx.clearRect(0, 0, w, h);  // keep it transparent
+
+    const t1:Point = DBPos1();
+    if(t1.x > 0)
+    {
+      //Draw distance and bearing
+      const t2:Point = DBPos2();
+      
+      const geo1 = img2Geo(t1.x, InvY(t1.y));
+      const geo2 = img2Geo(t2.x, InvY(t2.y));
+      //console.log(geo1);
+      //console.log(geo2);
+      const res = greatCircle(geo1, geo2, { unit: "nm" }); // nautical miles      
+
+      const p = img2Cli(t1.x, t1.y, false);
+      const p2 = img2Cli(t2.x, t2.y, false);
+      const x = 0;
+      const y = 0;
+      //ctx.strokeStyle = '#ef4444';
+      ctx.strokeStyle = '#429e85';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 5, 0, 2 * Math.PI);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(p2.x, p2.y, 5, 0, 2 * Math.PI);
+      ctx.stroke();
+
+      const fontH = 18;
+      const lineH = fontH+2;
+      const xmarg = 20;
+      const textY = p2.y+fontH;
+      ctx.fillStyle = '#1d5143af';
+      const line1 = `Dist: ${res.distance.toFixed(1)}nm`;
+      const line2 = `Bear: ${res.initialBearing.toFixed(1)}°`;
+      let s1 = ctx.measureText(line1).width*1.2;
+      let s2 = ctx.measureText(line2).width*1.2;     
+      ctx.beginPath();
+      ctx.roundRect(p2.x+10, p2.y, Math.max(s1, s2), lineH*2.2, 6);
+      ctx.fill();
+
+      ctx.font = `normal ${fontH}px courier`;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(line1, p2.x+xmarg, textY);
+      ctx.fillText(line2, p2.x+xmarg, textY + lineH);
+      //fgCtx.arc(p.x, p.y, 10, 0, 2 * Math.PI);
+      //fgCtx.arc(p.x, p.y, 15, 0, 2 * Math.PI);
+      
+
+      ctx.beginPath(); ctx.moveTo(p.x , p.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    // fgCtx.beginPath(); fgCtx.moveTo(0, h); fgCtx.lineTo(w, 0); fgCtx.stroke();
+      ctx.fillStyle = '#ef4444';
+      //fgCtx.beginPath(); fgCtx.arc(x, y, 4, 0, Math.PI * 2); fgCtx.fill();
+    }
+  }
 
     const DrawCanvas = () => {
         if(!canvasRef)
             return;
-
+console.log("draw canvas");
         /*let w = backCanvas.width/2;
         const p = img2Cli(w, 0);
         setCliCenter(p.x);*/
@@ -526,6 +642,7 @@ const dpr = () => Math.max(1, window.devicePixelRatio || 1);
         ctx.lineTo(p.x, canvasRef.height);
         ctx.stroke();
       
+        //DrawOverlay();
       }
 
          // Crosshair at mouse
@@ -901,6 +1018,7 @@ const hexProper = () => {
             
             const url = new URL('../assets/slar/SLAR_10420003.dat', import.meta.url).href;
             //const url = new URL('../assets/slar/SLAR_104d0003.dat', import.meta.url).href;
+            //tconst url = new URL('../assets/slar/SLAR_10510003.dat', import.meta.url).href;
 
             (async () => {
               const parsed = await readDatData(url);
@@ -994,6 +1112,12 @@ const hexProper = () => {
         // canvasRef.style.transform = `translateY(-${scrollY()}px)`;
      // }
     });
+    createEffect(() => {
+     // if (canvasRef) {
+        DrawOverlay();
+        // canvasRef.style.transform = `translateY(-${scrollY()}px)`;
+     // }
+    });
   
   const lensStyle: Partial<CSSStyleDeclaration> = {
     position: "fixed",                 // follows the page cursor
@@ -1021,8 +1145,10 @@ const hexProper = () => {
 
     return (
       <>
-      <div class="wfSB" id="contSBArea" ref={divRef} onWheel={handleWheel}>
-        <canvas class="testCanv" ref={canvasRef!}/>
+      <div class="wfSB" id="contSBArea" ref={divRef} onWheel={handleWheel}>        
+        <canvas id="slarCanv" ref={canvasRef!}/>
+        <canvas id="OLCanv" ref={OLCanvRef!}/>
+       
         <div class="lens" ref={lensDiv} style={lensStyle}>
             <canvas ref={lensCanvas}  style={lensCanvStyle}/>
           </div>
