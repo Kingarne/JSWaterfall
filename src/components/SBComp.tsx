@@ -1,5 +1,5 @@
 import { createSignal, onMount, onCleanup, createEffect, JSX, Accessor, createMemo } from "solid-js";
-import {createStore} from "solid-js/store";
+import {createStore, produce } from "solid-js/store";
 import { MSSEvent } from '../events';
 import InfoView from "./InfoView";
 import SettingsOverlay from "./SettingButt";
@@ -171,7 +171,29 @@ export default function SBComp()
       meta:{hover:boolean, selected:boolean}
     };
 
-   let targets: Target[] = [];
+    const def_TRG:Target[] = [];//{img:{x:0,y:0}, geo:{lat:0,lon:0}, meta:{hover:false, selected:false}};
+    
+    const [targets, setTargets] = createStore<Target[]>(def_TRG);
+// --- helpers ---
+ const addTarget = (t: Target) =>
+  setTargets(produce(list => { list.push(t); }));
+
+ const removeTrgAt = (index: number) =>
+  setTargets(produce(list => { list.splice(index, 1); }));
+
+ const setTrgImg = (index: number, x: number, y: number) =>
+  setTargets(index, "img", { x, y });
+
+ const setTrgGeo = (index: number, lat: number, lon: number) =>
+  setTargets(index, "geo", { lat, lon });
+
+ const setTrgHover = (index: number, hover: boolean) =>
+  setTargets(index, "meta", "hover", hover);
+
+ const toggleTrgSelected = (index: number) =>
+  setTargets(index, "meta", "selected", v => !v);
+
+   //let targets: Target[] = [];
 
   const css = () => {
       const [r, g, b, a] = rgba();
@@ -439,7 +461,8 @@ function drawLensAt(clientX: number, clientY: number) {
       targets.forEach((t, i) => {
         const cl = img2Cli(t.img.x, t.img.y, false);
         const dist = Math.hypot(cl.x-e.clientX, cl.y-e.clientY);
-        t.meta.hover = dist< 15;
+        setTrgHover(i, dist< 15);
+        //t.meta.hover = dist< 15;
       //  console.log(t.meta.hover);
 
       });
@@ -499,7 +522,8 @@ function drawLensAt(clientX: number, clientY: number) {
       {
         const p= cli2Img(e.clientX, e.clientY, false);
         const ta:Target = {img:{x:p.x, y:p.y},geo:{lat:59, lon:18}, meta:{hover:false, selected:false}};
-        targets.push(ta);
+        addTarget(ta);
+        //targets.push(ta);
       
         //console.log(ta);
         DrawOverlay();
@@ -627,18 +651,19 @@ function drawLensAt(clientX: number, clientY: number) {
       const p = img2Cli(t.img.x, t.img.y, false);
 
       //ctx.strokeStyle = '#7b11b2';
+      const sz = t.meta.hover ? 20:15;
       ctx.strokeStyle = '#000000';
       ctx.fillStyle = t.meta.hover ? '#1b11b25f' : '#7b11b2bf';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 15, 0, 2 * Math.PI);
+      ctx.arc(p.x, p.y, sz, 0, 2 * Math.PI);
      // ctx.stroke();
      //  ctx.beginPath();
      // ctx.arc(p.x, p.y, 15, 0, 2 * Math.PI);
       ctx.fill();
       ctx.stroke();
 
-      console.log(`#${i}: cx=${p.x}, cy=${p.y}, x=${t.img.x}, y=${t.img.y}, lat=${t.geo.lat}, lon=${t.geo.lon}`);
+      //console.log(`#${i}: cx=${p.x}, cy=${p.y}, x=${t.img.x}, y=${t.img.y}, lat=${t.geo.lat}, lon=${t.geo.lon}`);
     });
 
   }
@@ -711,7 +736,7 @@ console.log("draw canvas");
         ctx.lineTo(p.x, canvasRef.height);
         ctx.stroke();
       
-        DrawOverlay();
+       // DrawOverlay();
       }
 
          // Crosshair at mouse
