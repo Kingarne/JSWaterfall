@@ -1,4 +1,5 @@
 import { createSignal, onMount, onCleanup, createEffect, JSX, Accessor, createMemo } from "solid-js";
+import {createStore} from "solid-js/store";
 import { MSSEvent } from '../events';
 import InfoView from "./InfoView";
 import SettingsOverlay from "./SettingButt";
@@ -164,8 +165,15 @@ export default function SBComp()
     const [DBPos1, setDBPos1] = createSignal({x:-1, y:-1});  
     const [DBPos2, setDBPos2] = createSignal({x:-1, y:-1});  
   
-  
-    const css = () => {
+    type Target = {
+      img:Point;     
+      geo:LatLon; 
+      meta:{hover:boolean, selected:boolean}
+    };
+
+   let targets: Target[] = [];
+
+  const css = () => {
       const [r, g, b, a] = rgba();
       return `rgba(${r}, ${g}, ${b}, ${a / 255})`;
     };
@@ -339,7 +347,7 @@ const cloneHead = (h: LineDataHead): LineDataHead => ({ ...h });
       {
         const cm = keyHeld() === "c" ? 1 : 0;
         const pos = {cmd: cm, la:m.fLa, lo:m.fLo, t: Date.now()};
-        console.log(pos);
+        //console.log(pos);
         bc.postMessage(pos);
       }
     }
@@ -427,27 +435,39 @@ function drawLensAt(clientX: number, clientY: number) {
         return;
       }
 
-      if (!dragging()) return;
-      // If the left button is released, stop dragging
-      if ((e.buttons & 1) === 0) {
-        setDragging(false);
-        canvasRef.style.cursor = "crosshair";
-        return;
+      //hittest
+      targets.forEach((t, i) => {
+        const cl = img2Cli(t.img.x, t.img.y, false);
+        const dist = Math.hypot(cl.x-e.clientX, cl.y-e.clientY);
+        t.meta.hover = dist< 15;
+      //  console.log(t.meta.hover);
+
+      });
+      
+
+      if (dragging()){
+        // If the left button is released, stop dragging
+        if ((e.buttons & 1) === 0) {
+          setDragging(false);
+          canvasRef.style.cursor = "crosshair";
+          return;
+        }
+
+        const dx = e.clientX - dragStartX;
+        const dy = e.clientY - dragStartY;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+
+        let y = scrollY() - dy;                                   
+        const clampedY = Math.max(0, Math.min(y, (contentHeight()-divHeight())));
+        CenterAtVert(clampedY);
+
+        let x = scrollX() - dx; 
+        const clampedX = Math.max(0, Math.min(x, (contentWidth()-divWidth())));
+        CenterAtHor(clampedX);
       }
 
 
-      const dx = e.clientX - dragStartX;
-      const dy = e.clientY - dragStartY;
-      dragStartX = e.clientX;
-      dragStartY = e.clientY;
-
-      let y = scrollY() - dy;                                   
-      const clampedY = Math.max(0, Math.min(y, (contentHeight()-divHeight())));
-      CenterAtVert(clampedY);
-
-      let x = scrollX() - dx; 
-      const clampedX = Math.max(0, Math.min(x, (contentWidth()-divWidth())));
-      CenterAtHor(clampedX);
 
 //      console.log("dx:" + dx + ", dy: " + dy);
     //setPos(p);
@@ -473,12 +493,26 @@ function drawLensAt(clientX: number, clientY: number) {
         setDBPos1({x:p.x, y:p.y});
         //console.log("create target");
         //console.log(DBPos1());
-
       }
+
+      if(keyHeld() === "t")
+      {
+        const p= cli2Img(e.clientX, e.clientY, false);
+        const ta:Target = {img:{x:p.x, y:p.y},geo:{lat:59, lon:18}, meta:{hover:false, selected:false}};
+        targets.push(ta);
+      
+        //console.log(ta);
+        DrawOverlay();
+        //console.log(DBPos1());
+      }
+
+
+      
      //CenterAtImg(imgPos().x, imgPos().y);     
 
    // console.log("down:", imgPos().y)
   };
+
   const onPointerUp = () => {
       setDragging(false);
       canvasRef.style.cursor = "crosshair";
@@ -587,6 +621,26 @@ function drawLensAt(clientX: number, clientY: number) {
       ctx.fillStyle = '#ef4444';
       //fgCtx.beginPath(); fgCtx.arc(x, y, 4, 0, Math.PI * 2); fgCtx.fill();
     }
+
+    //Draw targets
+    targets.forEach((t, i) => {
+      const p = img2Cli(t.img.x, t.img.y, false);
+
+      //ctx.strokeStyle = '#7b11b2';
+      ctx.strokeStyle = '#000000';
+      ctx.fillStyle = t.meta.hover ? '#1b11b25f' : '#7b11b2bf';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 15, 0, 2 * Math.PI);
+     // ctx.stroke();
+     //  ctx.beginPath();
+     // ctx.arc(p.x, p.y, 15, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+
+      console.log(`#${i}: cx=${p.x}, cy=${p.y}, x=${t.img.x}, y=${t.img.y}, lat=${t.geo.lat}, lon=${t.geo.lon}`);
+    });
+
   }
 
     const DrawCanvas = () => {
@@ -657,7 +711,7 @@ console.log("draw canvas");
         ctx.lineTo(p.x, canvasRef.height);
         ctx.stroke();
       
-        //DrawOverlay();
+        DrawOverlay();
       }
 
          // Crosshair at mouse
