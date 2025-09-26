@@ -1,5 +1,5 @@
 import { createSignal, onMount, onCleanup, createEffect, JSX, Accessor, createMemo } from "solid-js";
-import {createStore, produce } from "solid-js/store";
+import {createStore, produce, unwrap  } from "solid-js/store";
 import { MSSEvent } from '../events';
 import InfoView from "./InfoView";
 import SettingsOverlay from "./SettingButt";
@@ -171,27 +171,45 @@ export default function SBComp()
       meta:{hover:boolean, selected:boolean}
     };
 
+    type Polygon = {
+      pts:Target[];           
+    };
+
     const def_TRG:Target[] = [];//{img:{x:0,y:0}, geo:{lat:0,lon:0}, meta:{hover:false, selected:false}};
     
-    const [targets, setTargets] = createStore<Target[]>(def_TRG);
-// --- helpers ---
- const addTarget = (t: Target) =>
-  setTargets(produce(list => { list.push(t); }));
+    const [targets, setTargets] = createStore<Target[]>([]);//def_TRG);
+    
+    // --- helpers ---
+    const addTarget = (t: Target) =>
+      setTargets(produce(list => { list.push(t); }));
 
- const removeTrgAt = (index: number) =>
-  setTargets(produce(list => { list.splice(index, 1); }));
+    const removeTrgAt = (index: number) =>
+      setTargets(produce(list => { list.splice(index, 1); }));
 
- const setTrgImg = (index: number, x: number, y: number) =>
-  setTargets(index, "img", { x, y });
+    const setTrgImg = (index: number, x: number, y: number) =>
+      setTargets(index, "img", { x, y });
 
- const setTrgGeo = (index: number, lat: number, lon: number) =>
-  setTargets(index, "geo", { lat, lon });
+    const setTrgGeo = (index: number, lat: number, lon: number) =>
+      setTargets(index, "geo", { lat, lon });
 
- const setTrgHover = (index: number, hover: boolean) =>
-  setTargets(index, "meta", "hover", hover);
+    const setTrgHover = (index: number, hover: boolean) =>
+      setTargets(index, "meta", "hover", hover);
 
- const toggleTrgSelected = (index: number) =>
-  setTargets(index, "meta", "selected", v => !v);
+    const toggleTrgSelected = (index: number) =>
+      setTargets(index, "meta", "selected", v => !v);
+
+    const [polygon, setPolygon] = createStore<Target[]>([]);
+    const [polygons, setPolygons] = createStore<Polygon[]>([]);
+
+    // --- helpers ---
+    const addPolyPt = (p: Target) => 
+      setPolygon(produce(list => { list.push(p); }));
+    const setPolyHover = (index: number, hover: boolean) =>
+      setPolygon(index, "meta", "hover", hover);
+
+    const addPoly = (p: Polygon) => 
+      setPolygons(produce(list => { list.push(p); }));
+    
 
    //let targets: Target[] = [];
 
@@ -268,8 +286,8 @@ const InvY = (y:number):number => {return (backCanvas.height-insertPos())-y;}
   let dy = imgY * zoom() - scrollY();
 
   // clamp to the canvas backing-store (device px)
-  dx = Math.min(canvasRef.width - 1, Math.max(0, Math.floor(dx)));
-  dy = Math.min(canvasRef.height - 1, Math.max(0, Math.floor(dy)));
+  //dx = Math.min(canvasRef.width - 1, Math.max(0, Math.floor(dx)));
+  //dy = Math.min(canvasRef.height - 1, Math.max(0, Math.floor(dy)));
 
   // device px → client (CSS) px
   const cliX = dx  + offsetX();
@@ -521,12 +539,26 @@ function drawLensAt(clientX: number, clientY: number) {
       if(keyHeld() === "t")
       {
         const p= cli2Img(e.clientX, e.clientY, false);
-        const ta:Target = {img:{x:p.x, y:p.y},geo:{lat:59, lon:18}, meta:{hover:false, selected:false}};
+        const g = img2Geo(p.x, p.y);
+        const ta:Target = {img:{x:p.x, y:p.y},geo:{lat:g.lat, lon:g.lon}, meta:{hover:false, selected:false}};
         addTarget(ta);
         //targets.push(ta);
       
         //console.log(ta);
-        DrawOverlay();
+       // DrawOverlay();
+        //console.log(DBPos1());
+      }
+
+      if(keyHeld() === "q")
+      {
+        const p= cli2Img(e.clientX, e.clientY, false);
+        const g = img2Geo(p.x, p.y);
+        const ta:Target = {img:{x:p.x, y:p.y},geo:{lat:g.lat, lon:g.lon}, meta:{hover:false, selected:false}};
+        addPolyPt(ta);
+        //targets.push(ta);
+      
+        //console.log(ta);
+       // DrawOverlay();
         //console.log(DBPos1());
       }
 
@@ -576,6 +608,23 @@ function drawLensAt(clientX: number, clientY: number) {
       if (e.key.toLowerCase() === "d") {        
         setDBPos1({x:-1, y:-1});
       }
+
+      if (e.key.toLowerCase() === "q") {        
+         // deep copy of plain data
+         //const pts: Target[] = JSON.parse(JSON.stringify(unwrap(polygon)));
+        //setPolygons(list => [...list, { pts }]);
+
+      const pts: Target[] = structuredClone(unwrap(polygon));
+      setPolygons(list => [...list, { pts }]);
+      //addPoly(pts);
+  
+
+       // const clone: Target[] = structuredClone(polygon);
+        //const poly = {pts:clone};
+        //addPoly(poly);
+        setPolygon([]);
+      }
+
       setKeyHeld('');
     };
 
@@ -585,7 +634,7 @@ function drawLensAt(clientX: number, clientY: number) {
 // --- Transparent overlay drawing (no background fill) ---
   const DrawOverlay = () => {
      const ctx = OLCanvRef!.getContext('2d', { willReadFrequently: true });
-    console.log("draw overlay");
+    //console.log("draw overlay");
      if(!ctx)
       return;
 
@@ -650,6 +699,8 @@ function drawLensAt(clientX: number, clientY: number) {
     targets.forEach((t, i) => {
       const p = img2Cli(t.img.x, t.img.y, false);
 
+      if(p.y > 0 && p.y<canvasRef!.height)
+      {
       //ctx.strokeStyle = '#7b11b2';
       const sz = t.meta.hover ? 20:15;
       ctx.strokeStyle = '#000000';
@@ -664,14 +715,85 @@ function drawLensAt(clientX: number, clientY: number) {
       ctx.stroke();
 
       //console.log(`#${i}: cx=${p.x}, cy=${p.y}, x=${t.img.x}, y=${t.img.y}, lat=${t.geo.lat}, lon=${t.geo.lon}`);
+      }
     });
+
+    //Draw polygon 
+    if(polygon.length > 0)
+    {
+      let start = polygon[0];
+      let p1 = img2Cli(start.img.x, start.img.y, false);  
+
+        polygon.forEach((t, i) => {
+        const p = img2Cli(t.img.x, t.img.y, false);
+
+        if(p.y > 0 && p.y<canvasRef!.height)
+        {
+        //ctx.strokeStyle = '#7b11b2';
+        const sz = t.meta.hover ? 10:5;
+        ctx.strokeStyle = '#ffffff';
+        ctx.fillStyle = t.meta.hover ? '#1b11b25f' : '#7b11b2bf';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, sz, 0, 2 * Math.PI);
+    
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = '#429e85';
+        ctx.beginPath(); ctx.moveTo(p1.x , p1.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+        p1 = p;
+        //console.log(`#${i}: cx=${p.x}, cy=${p.y}, x=${t.img.x}, y=${t.img.y}, lat=${t.geo.lat}, lon=${t.geo.lon}`);
+        }
+      });
+
+      ctx.beginPath(); ctx.moveTo(p1.x , p1.y); ctx.lineTo(cliPos().x, cliPos().y); ctx.stroke();
+    }
+
+    //Draw polygon 
+     console.log("polygons"  + polygons.length);
+    if(polygons.length > 0)
+    {      
+        polygons.forEach((poly, i) => {
+          //console.log(poly.pts.length);
+          //let start = poly.pts[0];
+          //console.log(start);
+          let start = poly.pts[0];
+          let sp = img2Cli(start.img.x, start.img.y, false);  
+          let cp = sp;
+          //  console.log("draw poly: "+ i);
+          poly.pts.forEach((t, i) => {
+            const p = img2Cli(t.img.x, t.img.y, false);
+
+           
+            //ctx.strokeStyle = '#7b11b2';
+            const sz = t.meta.hover ? 3:3;
+            /*ctx.strokeStyle = '#ffffff';
+            ctx.fillStyle = t.meta.hover ? '#1b11b25f' : '#7b11b2bf';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, sz, 0, 2 * Math.PI);        
+            ctx.fill();
+            ctx.stroke();*/
+            ctx.strokeStyle = '#429e85';
+            ctx.beginPath(); ctx.moveTo(cp.x , cp.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+            cp = p;
+            //console.log(`#${i}: cx=${p.x}, cy=${p.y}, x=${t.img.x}, y=${t.img.y}, lat=${t.geo.lat}, lon=${t.geo.lon}`);
+          
+        });
+        ctx.beginPath(); ctx.moveTo(cp.x , cp.y); ctx.lineTo(sp.x, sp.y); ctx.stroke();
+
+
+        });
+
+     
+    }
 
   }
 
     const DrawCanvas = () => {
         if(!canvasRef)
             return;
-console.log("draw canvas");
+      //console.log("draw canvas");
         /*let w = backCanvas.width/2;
         const p = img2Cli(w, 0);
         setCliCenter(p.x);*/
