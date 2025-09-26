@@ -628,13 +628,21 @@ function drawLensAt(clientX: number, clientY: number) {
       setKeyHeld('');
     };
 
+    const hsl = (h:number, s:number, l:number, a:number = 1) => {
+  const hue = ((h % 360) + 360) % 360;         // wrap
+  const sat = Math.max(0, Math.min(100, s));   // clamp
+  const lig = Math.max(0, Math.min(100, l));   // clamp
+  const alp = Math.max(0, Math.min(1, a));     // clamp
+  return `hsl(${hue} ${sat}% ${lig}% / ${alp})`;
+};
+
   const onLeave = () => { setHover(false); DrawCanvas(); };
   const dpr = () => Math.max(1, window.devicePixelRatio || 1);
 
 // --- Transparent overlay drawing (no background fill) ---
   const DrawOverlay = () => {
      const ctx = OLCanvRef!.getContext('2d', { willReadFrequently: true });
-    //console.log("draw overlay");
+    console.log("draw overlay");
      if(!ctx)
       return;
 
@@ -750,15 +758,15 @@ function drawLensAt(clientX: number, clientY: number) {
     }
 
     //Draw polygon 
-     console.log("polygons"  + polygons.length);
+     //console.log("polygons"  + polygons.length);
     if(polygons.length > 0)
     {      
         polygons.forEach((poly, i) => {
           //console.log(poly.pts.length);
           //let start = poly.pts[0];
           //console.log(start);
-          let start = poly.pts[0];
-          let sp = img2Cli(start.img.x, start.img.y, false);  
+          let start = poly?.pts[0];
+          let sp = img2Cli(start?.img.x, start?.img.y, false);  
           let cp = sp;
           //  console.log("draw poly: "+ i);
           poly.pts.forEach((t, i) => {
@@ -787,6 +795,25 @@ function drawLensAt(clientX: number, clientY: number) {
 
      
     }
+
+    //Draw heading as a color (hue)
+    if(keyHeld() === 'h')
+    {
+    for (let y = 0; y  <canvasRef!.height; y++) {
+      //console.log(y);
+      const mid = canvasRef!.width/2;
+      let p = cli2Img(mid, y);
+      if(p.y<0 || p.y >= slarData.lineCount )
+        break;
+
+      const head = slarData.lines[p.y].head.fHeading;
+      ctx.strokeStyle =  hsl(head, 80, 55);
+      ctx.beginPath(); ctx.moveTo(mid-10 , y); ctx.lineTo(mid+10, y); ctx.stroke();
+      //console.log(p.y);
+      //console.log(slarData.lines[y].head.fHeading);
+
+    }
+  }
 
   }
 
@@ -1023,7 +1050,8 @@ function addSlarLine(data:any) : number
               setContentHeight(contentHeight()+1);     
               if(scrollY() != 0)
                 setScrollY(scrollY()+zoom());         
-              DrawCanvas();
+           //   DrawCanvas();
+             // DrawOverlay();
               pick(cliPos().x,cliPos().y);
             }
 
@@ -1294,7 +1322,7 @@ const hexProper = () => {
             
           }
       //  updateCanvasSize();
-        const ro = new ResizeObserver(() => {updateCanvasSize();setupLensCanvas();DrawCanvas();});
+        const ro = new ResizeObserver(() => {updateCanvasSize();setupLensCanvas();DrawCanvas();DrawOverlay();});
         if (divRef) {
             ro.observe(divRef);}
 
