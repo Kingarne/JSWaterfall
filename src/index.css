@@ -136,3 +136,12 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
 /* Overlay is fully transparent to input */
 #OLCanv { pointer-events: none; }  /* <- mouse goes through */
+
+#objinfo h1{
+
+    font-size: 18px;
+    color: #4264b4;      /* slate-900 */
+    margin: 0.5rem 0;
+    letter-spacing: 0.02em;
+    text-align: center;
+}

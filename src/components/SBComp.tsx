@@ -124,6 +124,9 @@ export default function SBComp()
     let lensCanvas!: HTMLCanvasElement; // canvas inside the lens
     let lensDiv!: HTMLDivElement;       // floating lens container
     let lensCtx!: CanvasRenderingContext2D;
+    
+    const objInfoSize = 150;
+    let objDiv!: HTMLDivElement;
 
     const INITIAL_PARSED_DAT: ParsedDat = {
   info: {} as LineDataInfo, // TODO: put your real defaults here
@@ -415,7 +418,7 @@ function drawLensAt(clientX: number, clientY: number) {
     //console.log("cli: " + clientX + ", " + clientY);
     //lensDiv.style.transform = `translate3d(${left}px, ${top}px, 0)`;
     lensDiv.style.transform = `translate3d(${clientX}px, ${clientY}px, 0)`;
-
+    
     lensCtx.clearRect(0, 0, lensSize, lensSize);
 
  // Source rect in image px: make it lensSize/zoom, centered on (ix, iy)
@@ -475,16 +478,23 @@ function drawLensAt(clientX: number, clientY: number) {
         return;
       }
 
+      let hit = false;
       //hittest
       targets.forEach((t, i) => {
         const cl = img2Cli(t.img.x, t.img.y, false);
         const dist = Math.hypot(cl.x-e.clientX, cl.y-e.clientY);
+        hit = !hit ? dist< 15 :hit;
         setTrgHover(i, dist< 15);
         //t.meta.hover = dist< 15;
       //  console.log(t.meta.hover);
-
+        
       });
       
+      if(hit)
+      {
+        objDiv.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;     
+      }
+       objDiv.style.opacity =  `${hit?0.7:0}`;
 
       if (dragging()){
         // If the left button is released, stop dragging
@@ -828,7 +838,7 @@ function drawLensAt(clientX: number, clientY: number) {
         //console.log("DrawCanvas");
         const ctx = canvasRef.getContext("2d", { willReadFrequently: true });
         if (!ctx) return;
-        ctx.fillStyle = "#93b0f1";
+        ctx.fillStyle = "#18144a";//"#93b0f1";
         ctx.fillRect(0, 0, canvasRef.width, canvasRef.height);
 
        // ctx.fillStyle = "#8080fb";
@@ -1363,6 +1373,24 @@ const hexProper = () => {
      // }
     });
 
+    
+  const objInfoStyle: Partial<CSSStyleDeclaration> = {
+    position: "fixed",                 // follows the page cursor
+    left: "0px",
+    top: "0px",
+    width: `${objInfoSize}px`,
+    height: `${objInfoSize}px`,
+    "pointer-events": "none",             // let mouse pass through
+    opacity: "0%",                      // hidden until 'm' is held
+    transition: "opacity 80ms linear",
+    border: "2px solid rgba(255,255,255,.3)",
+    boxShadow: "0 6px 20px rgba(10,10,z0,.35)",
+    borderRadius: "5px",//"9999px",
+    "border-radius": "10px",
+    overflow: "hidden",
+    background: "#000",
+    zIndex: "9999",
+  };
    
   const lensStyle: Partial<CSSStyleDeclaration> = {
     position: "fixed",                 // follows the page cursor
@@ -1375,7 +1403,7 @@ const hexProper = () => {
     transition: "opacity 80ms linear",
     border: "2px solid rgba(255,255,255,.3)",
     boxShadow: "0 6px 20px rgba(10,10,z0,.35)",
-    borderRadius: "9999px",
+    borderRadius: "5px",//"9999px",
     overflow: "hidden",
     background: "#000",
     zIndex: "9999",
@@ -1397,6 +1425,8 @@ const hexProper = () => {
         <div class="lens" ref={lensDiv} style={lensStyle}>
             <canvas ref={lensCanvas}  style={lensCanvStyle}/>
           </div>
+          
+          <div id="objinfo" ref={objDiv} style={objInfoStyle}><h1>Target text</h1></div>
          {/* Top overlay with an image icon; shown only on hover */}
       
       <div
