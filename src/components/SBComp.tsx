@@ -11,6 +11,13 @@ import { linesToGrayscaleImageData } from "./DatParser";
 import { LineDataHead } from "./DatParser";
 import { greatCircle, destinationPoint, LatLon } from "./geo";
 import { DistBear } from "./InfoView";
+import  TargetInfo  from "./TargetInfo";
+
+export type Target = {
+      img:Point;     
+      geo:LatLon; 
+      meta:{hover:boolean, selected:boolean}
+    };
 
 type RGBA = [number, number, number, number];
 type Point = { x: number; y: number };
@@ -126,7 +133,9 @@ export default function SBComp()
     let lensCtx!: CanvasRenderingContext2D;
     
     const objInfoSize = 150;
-    let objDiv!: HTMLDivElement;
+    //let objDiv!: HTMLDivElement;
+    let trgInfo!: HTMLDivElement;
+    
 
     const INITIAL_PARSED_DAT: ParsedDat = {
   info: {} as LineDataInfo, // TODO: put your real defaults here
@@ -168,18 +177,14 @@ export default function SBComp()
     const [DBPos1, setDBPos1] = createSignal({x:-1, y:-1});  
     const [DBPos2, setDBPos2] = createSignal({x:-1, y:-1});  
   
-    type Target = {
-      img:Point;     
-      geo:LatLon; 
-      meta:{hover:boolean, selected:boolean}
-    };
+    
 
     type Polygon = {
       pts:Target[];           
     };
 
     const def_TRG:Target[] = [];//{img:{x:0,y:0}, geo:{lat:0,lon:0}, meta:{hover:false, selected:false}};
-    
+    const [activeIndex, setActiveIndex] = createSignal<number | null>(null);
     const [targets, setTargets] = createStore<Target[]>([]);//def_TRG);
     
     // --- helpers ---
@@ -478,23 +483,31 @@ function drawLensAt(clientX: number, clientY: number) {
         return;
       }
 
-      let hit = false;
+      let hitState = false;
       //hittest
       targets.forEach((t, i) => {
         const cl = img2Cli(t.img.x, t.img.y, false);
         const dist = Math.hypot(cl.x-e.clientX, cl.y-e.clientY);
-        hit = !hit ? dist< 15 :hit;
-        setTrgHover(i, dist< 15);
+        const hit = dist< 15;
+        hitState = !hitState ? hit :hitState;
+        setTrgHover(i, hit);
+        if(hit){
+          console.log("set active index:" + i);
+          setActiveIndex(i);
+        }
+
         //t.meta.hover = dist< 15;
       //  console.log(t.meta.hover);
         
       });
       
-      if(hit)
+      if(hitState)
       {
-        objDiv.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;     
+        //objDiv.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;     
+        trgInfo.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;     
       }
-       objDiv.style.opacity =  `${hit?0.7:0}`;
+       //objDiv.style.opacity =  `${hit?0.7:0}`;
+       trgInfo.style.opacity =  `${hitState?0.85:0}`;
 
       if (dragging()){
         // If the left button is released, stop dragging
@@ -1270,9 +1283,9 @@ const hexProper = () => {
             //DrawCanvas();
                      
             
-            const url = new URL('../assets/slar/SLAR_10420003.dat', import.meta.url).href;
-            //const url = new URL('../assets/slar/SLAR_104d0003.dat', import.meta.url).href;
-            //tconst url = new URL('../assets/slar/SLAR_10510003.dat', import.meta.url).href;
+            //const url = new URL('../assets/slar/SLAR_10420003.dat', import.meta.url).href;
+            const url = new URL('../assets/slar/SLAR_104d0003.dat', import.meta.url).href;
+            //const url = new URL('../assets/slar/SLAR_10510003.dat', import.meta.url).href;
 
             (async () => {
               const parsed = await readDatData(url);
@@ -1373,7 +1386,13 @@ const hexProper = () => {
      // }
     });
 
-    
+    // The ONE active target (reactive)
+const activeTarget = createMemo<Target | undefined>(() => {
+  const i = activeIndex();
+  console.log("active index:" + i);
+  return i == null ? undefined : targets[i];
+});
+
   const objInfoStyle: Partial<CSSStyleDeclaration> = {
     position: "fixed",                 // follows the page cursor
     left: "0px",
@@ -1426,7 +1445,13 @@ const hexProper = () => {
             <canvas ref={lensCanvas}  style={lensCanvStyle}/>
           </div>
           
-          <div id="objinfo" ref={objDiv} style={objInfoStyle}><h1>Target text</h1></div>
+          <TargetInfo
+            ref={el => (trgInfo = el)}
+            idx={scrollY()}
+            target={activeTarget()}
+          />
+
+          
          {/* Top overlay with an image icon; shown only on hover */}
       
       <div
