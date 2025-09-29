@@ -1,5 +1,6 @@
 :root {
-  --head: #82d682;
+  --headCol: #82d682;
+  --valCol: #ffe400;
   --white: #ffffff;
 }
 
@@ -114,7 +115,7 @@ body {
 }
 
 .head{
-  color: var(--head);
+  color: var(--headCol);
 }
 
 .lens{       
@@ -127,7 +128,7 @@ body {
   position: absolute;
   left:0;
   background-color: #68686892;
-  color: var(--head);
+  color: var(--headCol);
  /* visibility: hidden;*/
 }
   
@@ -149,7 +150,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 #targetinfo h1{
 
     font-size: 18px;
-    color: #4264b4;      /* slate-900 */
+    color: var(--headCol);      /* slate-900 */
     margin: 0.5rem 0;
     letter-spacing: 0.02em;
     text-align: center;

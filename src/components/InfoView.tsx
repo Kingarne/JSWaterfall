@@ -75,7 +75,7 @@ const arrowStyle: JSX.CSSProperties = {
         <>
              <div ref={infoDiv!} class="info"style={{
         position: 'absolute', width:'220px',  display: "flow-root", height:'200px', left: '8px', top: '20px', padding: '6px 8px', 'border-radius': '8px',
-        background: 'rgba(0, 0, 0, 0.55)', color: '#ffe400', 'font-family': 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+        background: 'rgba(0, 0, 0, 0.55)', color: 'var(--valCol)', 'font-family': 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
         'font-size': '14px', 'pointer-events': 'none' 
         }}> 
         <div style={{ display: 'flex', 'align-items': 'left', "flex-direction": "column", gap: '6px' }}>  

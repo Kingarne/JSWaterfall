@@ -34,7 +34,7 @@ function Row(props: { label: string; value: string }) {
     <tr>
       <th
         style={{
-          color: "#22c55e",           // green
+          color: "var(--headCol)",           // green
           "text-align": "left",
           "font-weight": 600,
           padding: "2px 8px 2px 5px",
@@ -47,7 +47,7 @@ function Row(props: { label: string; value: string }) {
       </th>
       <td
         style={{
-          color: "#facc15",           // yellow
+          color: "var(--valCol)",           // yellow
           "text-align": "left",
           padding: "2px 0",
         }}
