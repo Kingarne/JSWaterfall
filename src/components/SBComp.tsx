@@ -13,6 +13,10 @@ import { greatCircle, destinationPoint, LatLon } from "./geo";
 import { DistBear } from "./InfoView";
 import  TargetInfo  from "./TargetInfo";
 
+declare global {
+  interface Window { cv: any }
+}
+
 export type Target = {
       img:Point;     
       geo:LatLon; 
@@ -121,6 +125,8 @@ export default function SBComp()
     let infoV: HTMLDivElement;        
     let canvasRef: HTMLCanvasElement;
     let OLCanvRef: HTMLCanvasElement;    
+    let OCvCanvRef: HTMLCanvasElement;    
+    
     let overlay!: HTMLDivElement;
     let ro: ResizeObserver | undefined;
 
@@ -136,6 +142,27 @@ export default function SBComp()
     //let objDiv!: HTMLDivElement;
     let trgInfo!: HTMLDivElement;
     
+    let cv:any;
+    async function waitForCv(): Promise<any> {
+    return new Promise((resolve) => {
+      const tick = () => {
+        const g: any = (window as any).cv;
+        if (!g) return setTimeout(tick, 50);
+        if (typeof g === "function") {
+          // Factory/MODULARIZE build
+          g().then((mod: any) => { (window as any).cv = mod; resolve(mod); });
+          return;
+        }
+        if (typeof g === "object") {
+          if (typeof g.Mat === "function") return resolve(g);
+          g.onRuntimeInitialized = () => resolve(g);
+          return;
+        }
+        setTimeout(tick, 50);
+      };
+      tick();
+    });
+  }
 
     const INITIAL_PARSED_DAT: ParsedDat = {
   info: {} as LineDataInfo, // TODO: put your real defaults here
@@ -506,7 +533,7 @@ function drawLensAt(clientX: number, clientY: number) {
         //objDiv.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;     
         trgInfo.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;     
       }
-       //objDiv.style.opacity =  `${hit?0.7:0}`;
+       //objDiv.style.opacity =  `${hit?0.7:0}`;t
        trgInfo.style.opacity =  `${hitState?0.85:0}`;
 
       if (dragging()){
@@ -609,6 +636,10 @@ function drawLensAt(clientX: number, clientY: number) {
    // Hold 'm' to show lens
     const onKeyDown = (e: KeyboardEvent) => {
       
+      if (e.key.toLowerCase() === "m") {        
+        OCvCanvRef!.style.opacity ='1';
+      }
+
       //if (e.key.toLowerCase() === "z") {
         if (keyHeld() !== e.key.toLowerCase()) {
           setKeyHeld(e.key.toLowerCase());        
@@ -646,6 +677,10 @@ function drawLensAt(clientX: number, clientY: number) {
         //const poly = {pts:clone};
         //addPoly(poly);
         setPolygon([]);
+      }
+
+      if (e.key.toLowerCase() === "m") {        
+        OCvCanvRef!.style.opacity ='0';
       }
 
       setKeyHeld('');
@@ -843,6 +878,8 @@ function drawLensAt(clientX: number, clientY: number) {
     const DrawCanvas = () => {
         if(!canvasRef)
             return;
+
+        //let src = cv.imread('canvasInput');
       //console.log("draw canvas");
         /*let w = backCanvas.width/2;
         const p = img2Cli(w, 0);
@@ -1257,14 +1294,87 @@ function step(timestamp:DOMHighResTimeStamp) {
  requestAnimationFrame(step);
 }  
 
+/** Load an <img> from a URL (same-origin or CORS-enabled) */
+function loadImage(url: string, crossOrigin?: "anonymous" | "use-credentials"): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    if (crossOrigin) img.crossOrigin = crossOrigin;
+    img.onload = () => resolve(img);
+    img.onerror = (e) => reject(e);
+    img.src = url;
+  });
+}
+
+
+const imgBmp = new URL('../assets/test.png', import.meta.url).href;
+
+async function toGrayFromUrl(url: string, canvas: HTMLCanvasElement): Promise<void> {
+  //const cv = await waitForCv();
+  const img = await loadImage(url);
+
+  
+  const gray = new cv.Mat();
+  try {
+
+let src = cv.imread(img);
+let dst = cv.Mat.zeros(src.rows, src.cols, cv.CV_8UC3);
+cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
+cv.threshold(src, src, 100, 150, cv.THRESH_BINARY);
+let contours = new cv.MatVector();
+let hierarchy = new cv.Mat();
+let poly = new cv.MatVector();
+cv.findContours(src, contours, hierarchy, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE);
+// approximates each contour to polygon
+for (let i = 0; i < contours.size(); ++i) {
+    let tmp = new cv.Mat();
+    let cnt = contours.get(i);
+    // You can try more different parameters
+    cv.approxPolyDP(cnt, tmp, 6, true);
+    poly.push_back(tmp);
+    cnt.delete(); tmp.delete();
+}
+// draw contours with random Scalar
+for (let i = 0; i < contours.size(); ++i) {
+    let color = new cv.Scalar(Math.round(Math.random() * 255), Math.round(Math.random() * 255),
+                              Math.round(Math.random() * 255));
+    cv.drawContours(dst, poly, i, color, 1, 8, hierarchy, 0);
+}
+cv.imshow(canvas, dst);
+src.delete(); dst.delete(); hierarchy.delete(); contours.delete(); poly.delete();
+
+
+ //   cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+   // canvas.width = gray.cols;
+   // canvas.height = gray.rows;
+    //cv.imshow(canvas, src);
+  } finally {
+    //src.delete();
+   // gray.delete();
+  }
+}
+
+const onCvReady = () => {  
+  cv = window.cv;
+  //console.log(cv.getBuildInformation);
+  let mat = cv.matFromArray(2, 2, cv.CV_8UC1, [5, 6, 7, 8]);
+ console.log(mat); 
+
+  toGrayFromUrl(imgBmp, OCvCanvRef!);
+  //OCvCanvRef!.style.opacity ='1';
+  //  setCvMod(window.cv);
+}
+
 const hexProper = () => {
   const [r,g,b] = rgba();
   const toHex = (n:number) => n.toString(16).padStart(2,'0');
   return '#' + toHex(r) + toHex(g) + toHex(b);
 };
     //let timerId:number=0;
-    onMount(() => {
+    onMount(async () => {
 
+    
+      window.addEventListener("opencv-ready", onCvReady, { once: true });
+    
         //img.onload = () => {
             lensCtx = lensCanvas.getContext("2d")!;
             backCanvas.width = 2672;//img.width;
@@ -1440,6 +1550,7 @@ const activeTarget = createMemo<Target | undefined>(() => {
       <div class="wfSB" id="contSBArea" ref={divRef} onWheel={handleWheel}>        
         <canvas id="slarCanv" ref={canvasRef!}/>
         <canvas id="OLCanv" ref={OLCanvRef!}/>
+        <canvas id="OCvCanv" ref={OCvCanvRef!}/>
        
         <div class="lens" ref={lensDiv} style={lensStyle}>
             <canvas ref={lensCanvas}  style={lensCanvStyle}/>

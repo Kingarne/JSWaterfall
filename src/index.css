@@ -137,6 +137,10 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
 /* Overlay is fully transparent to input */
 #OLCanv { pointer-events: none; }  /* <- mouse goes through */
+#OCvCanv { 
+  width : 500;
+  height : 500;
+  pointer-events: none; }  /* <- mouse goes through */
 
 #objinfo h1{
 

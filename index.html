@@ -11,5 +11,31 @@
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div class="root" id="rootId"></div>
     <script src="/src/index.tsx" type="module"></script>
+    <script async src="./src/opencv.js" onload=bootCv() type="text/javascript"></script>
+
+     <script>
+  
+  function bootCv() {
+    if (typeof cv === 'function') {
+      // Factory build: cv() returns a Promise that resolves to the module
+      cv().then((module) => {
+        window.cv = module;
+        onCvReady();
+      });
+    } else if (typeof cv === 'object') {
+      // Global module build
+      if (typeof cv.Mat === 'function') onCvReady();
+      else cv.onRuntimeInitialized = onCvReady;
+    }
+  }
+  function onCvReady() {
+    // ready = true; setStatus('OpenCV loaded'); initUI();
+    console.log("OpenCV loaded!");
+    let mat = window.cv.matFromArray(2, 2, cv.CV_8UC1, [1, 2, 3, 4]);
+    console.log (mat);
+    window.dispatchEvent(new Event("opencv-ready"));
+  }
+</script>
+
   </body>
 </html>
