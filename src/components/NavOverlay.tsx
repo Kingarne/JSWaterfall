@@ -100,7 +100,7 @@ export default function NavTableOverlay(props: {
   const wrapStyle: Partial<CSSStyleDeclaration> = {
     position: "fixed",
     right: "16px",
-    top: "16px",
+    bottom: "56px",
     zIndex: "9999",
     //"pointer-events": "none",         // don’t block canvas events
   };

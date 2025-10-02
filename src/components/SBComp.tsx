@@ -12,6 +12,8 @@ import { LineDataHead } from "./DatParser";
 import { greatCircle, destinationPoint, LatLon } from "./geo";
 import { DistBear } from "./InfoView";
 import  TargetInfo  from "./TargetInfo";
+import { RoiOverlay, type Roi } from "./RoiOverlay";
+import SlideInMenu from "./SlideInMenu";
 
 declare global {
   interface Window { cv: any }
@@ -137,7 +139,7 @@ export default function SBComp()
     let lensCanvas!: HTMLCanvasElement; // canvas inside the lens
     let lensDiv!: HTMLDivElement;       // floating lens container
     let lensCtx!: CanvasRenderingContext2D;
-    
+    const [roi, setRoi] = createSignal<Roi>({ x: 100, y: 100, w: 200, h: 200 });
     const objInfoSize = 150;
     //let objDiv!: HTMLDivElement;
     let trgInfo!: HTMLDivElement;
@@ -569,6 +571,7 @@ function drawLensAt(clientX: number, clientY: number) {
 
   const onPointerDown = (e: PointerEvent) => {
      //CenterAtImgVert( imgPos().y);
+     console.log("ptr down")
       if (e.button !== 0) return; // left only
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
      setDragging(true);
@@ -875,6 +878,104 @@ function drawLensAt(clientX: number, clientY: number) {
 
   }
 
+  function thresholdPatchWithContoursDark(
+  canvas: HTMLCanvasElement,
+  x = 100, y = 100, w = 200, h = 200,
+  // Use inverted threshold to target dark objects by default:
+  thresh: number | null = null,                // if null, Otsu decides
+  maxVal = 255,
+  contourColor: [number, number, number, number] = [255, 0, 0, 255], // red RGBA
+  contourThickness = 2
+) {
+  const cv = window.cv;
+  const ctx = canvas.getContext("2d")!;
+  const W = canvas.width, H = canvas.height;
+
+  // Clamp ROI
+  x = Math.max(0, Math.min(x, W));
+  y = Math.max(0, Math.min(y, H));
+  w = Math.max(0, Math.min(w, W - x));
+  h = Math.max(0, Math.min(h, H - y));
+  if (w === 0 || h === 0) return;
+
+  // Grab pixels
+  const imgData = ctx.getImageData(x, y, w, h); // RGBA
+  const rgba = cv.matFromImageData(imgData);
+
+  // Mats
+  const gray = new cv.Mat();
+  const blurred = new cv.Mat();
+  const bin = new cv.Mat();
+  //const out = new cv.Mat();
+  const contours = new cv.MatVector();
+  const hierarchy = new cv.Mat();
+
+  try {
+    // RGBA -> GRAY
+    cv.cvtColor(rgba, gray, cv.COLOR_RGBA2GRAY);
+
+    // Light smoothing helps reduce speckle before threshold
+    cv.GaussianBlur(gray, blurred, new cv.Size(3, 3), 0, 0, cv.BORDER_DEFAULT);
+
+    // Threshold so DARK -> white (foreground)
+    // If thresh == null, use Otsu with inverted binary
+    if (thresh == null) {
+      //cv.adaptiveThreshold(gray, bin, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 11, 2);
+      cv.threshold(blurred,bin, 0, maxVal,cv.THRESH_BINARY_INV | cv.THRESH_OTSU);
+    } else {
+      cv.threshold(
+        blurred,
+        bin,
+        thresh, maxVal,
+        cv.THRESH_BINARY_INV
+      );
+    }
+
+    // Find outer contours on binary
+    cv.findContours(bin, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+    // Prepare RGBA to draw colored contours
+   // cv.cvtColor(bin, out, cv.COLOR_GRAY2RGBA);
+      const epsilonRatio = 0.01;
+    // Draw contours
+    const color = new cv.Scalar(contourColor[0], contourColor[1], contourColor[2], contourColor[3]);
+    console.log("size:"+ contours.size());
+    for (let i = 0; i < contours.size(); i++) {
+      const cnt = contours.get(i);
+      const peri = cv.arcLength(cnt, true);
+      console.log("peri:"+ peri);
+      if(peri < 100)
+        continue;
+      const eps = Math.max(1e-3, epsilonRatio * peri);  // avoid epsilon=0
+
+      const approx = new cv.Mat();          // Mat of points
+      cv.approxPolyDP(cnt, approx, eps, true);
+
+      // drawContours needs a MatVector; wrap the approx in one
+      const vv = new cv.MatVector();
+      vv.push_back(approx);
+      cv.drawContours(rgba, vv, 0, color, contourThickness, cv.LINE_8, new cv.Mat(), 0);
+
+      vv.delete();
+      approx.delete();
+      cnt.delete(); // delete handle from get(i)
+    }
+
+    // Put back into canvas
+    const outData = new ImageData(new Uint8ClampedArray(rgba.data), w, h);
+    ctx.putImageData(outData, x, y);
+  } finally {
+    for (let i = 0; i < contours.size(); i++) contours.get(i).delete();
+    contours.delete();
+    hierarchy.delete();
+    rgba.delete();
+    gray.delete();
+    blurred.delete();
+    bin.delete();
+    //out.delete();
+  }
+}
+
     const DrawCanvas = () => {
         if(!canvasRef)
             return;
@@ -945,6 +1046,14 @@ function drawLensAt(clientX: number, clientY: number) {
         ctx.lineTo(p.x, canvasRef.height);
         ctx.stroke();
       
+        if(cv !== undefined)
+        {
+        const w=roi().w;
+        const h=roi().h;
+        const x = canvasRef.width/2-w/2;
+        const y = canvasRef.height/2-h/2;
+        thresholdPatchWithContoursDark(canvasRef, roi().x, roi().y, roi().w, roi().h, 100);
+        }
        // DrawOverlay();
       }
 
@@ -1357,9 +1466,9 @@ const onCvReady = () => {
   cv = window.cv;
   //console.log(cv.getBuildInformation);
   let mat = cv.matFromArray(2, 2, cv.CV_8UC1, [5, 6, 7, 8]);
- console.log(mat); 
+  console.log(mat); 
 
-  toGrayFromUrl(imgBmp, OCvCanvRef!);
+  //toGrayFromUrl(imgBmp, OCvCanvRef!);
   //OCvCanvRef!.style.opacity ='1';
   //  setCvMod(window.cv);
 }
@@ -1552,6 +1661,13 @@ const activeTarget = createMemo<Target | undefined>(() => {
         <canvas id="OLCanv" ref={OLCanvRef!}/>
         <canvas id="OCvCanv" ref={OCvCanvRef!}/>
        
+        <RoiOverlay
+      canvas={() => OLCanvRef!}
+      roi={roi}
+      onChange={setRoi}
+      minSize={12}
+      visible={true}
+    />
         <div class="lens" ref={lensDiv} style={lensStyle}>
             <canvas ref={lensCanvas}  style={lensCanvStyle}/>
           </div>
@@ -1635,6 +1751,23 @@ const activeTarget = createMemo<Target | undefined>(() => {
       />
       <NavOverlay json={navJson()} latLonFormat="dec" units={{ speed: "kn", altitude: "m" }} />
     
+
+     <div style={{ padding: "16px", color: "#e5e7eb", background: "#0b1220", height: "100vh" }}>
+      <SlideInMenu
+        onConfineThresh={() => console.log("Confine & Thresh")}
+        onSelectPolygons={() => console.log("SelectPolygons")}
+        onCreateMss={() => console.log("Create MSS Polygons")}
+        onAdjustMss={() => console.log("Adjust MSS Polygons")}
+        onChangeThreshold={(v) => console.log("threshold", v)}
+        onChangeEpsilon={(v) => console.log("epsilon", v)}
+        onChangeInvert={(v) => console.log("invert", v)}
+      >
+        {/* trigger button */}
+        <div style="display:inline-block;background:#0f2036;border:1px solid #27456e;color:#e5e7eb;padding:8px 12px;border-radius:10px;cursor:pointer;">
+         Img Proc.
+        </div>
+      </SlideInMenu>
+    </div>
       </>
     );
   }
