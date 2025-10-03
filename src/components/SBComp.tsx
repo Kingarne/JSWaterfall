@@ -139,7 +139,7 @@ export default function SBComp()
     let lensCanvas!: HTMLCanvasElement; // canvas inside the lens
     let lensDiv!: HTMLDivElement;       // floating lens container
     let lensCtx!: CanvasRenderingContext2D;
-    const [roi, setRoi] = createSignal<Roi>({ x: 100, y: 100, w: 200, h: 200 });
+    const [roi, setRoi] = createSignal<Roi>({ x: 300, y: 300, w: 200, h: 200 });
     const objInfoSize = 150;
     //let objDiv!: HTMLDivElement;
     let trgInfo!: HTMLDivElement;
@@ -206,7 +206,11 @@ export default function SBComp()
     const [DBPos1, setDBPos1] = createSignal({x:-1, y:-1});  
     const [DBPos2, setDBPos2] = createSignal({x:-1, y:-1});  
   
-    
+    //img proc
+    const [threshold, setThreshold] = createSignal(100);    
+    const [eps, setEps] = createSignal(100);    
+    const [invPolarity, setInvPolarity] = createSignal(false);    
+    const [procActive, setProcActive] = createSignal(false);    
 
     type Polygon = {
       pts:Target[];           
@@ -923,11 +927,14 @@ function drawLensAt(clientX: number, clientY: number) {
       //cv.adaptiveThreshold(gray, bin, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 11, 2);
       cv.threshold(blurred,bin, 0, maxVal,cv.THRESH_BINARY_INV | cv.THRESH_OTSU);
     } else {
+      //default polarity is black on white objects.
+      const mode = invPolarity() ? cv.THRESH_BINARY : cv.THRESH_BINARY_INV;
+      console.log(mode)
       cv.threshold(
         blurred,
         bin,
         thresh, maxVal,
-        cv.THRESH_BINARY_INV
+        mode
       );
     }
 
@@ -936,14 +943,14 @@ function drawLensAt(clientX: number, clientY: number) {
 
     // Prepare RGBA to draw colored contours
    // cv.cvtColor(bin, out, cv.COLOR_GRAY2RGBA);
-      const epsilonRatio = 0.01;
+      const epsilonRatio = eps()/10000;//0.01;
     // Draw contours
     const color = new cv.Scalar(contourColor[0], contourColor[1], contourColor[2], contourColor[3]);
-    console.log("size:"+ contours.size());
+    //console.log("size:"+ contours.size());
     for (let i = 0; i < contours.size(); i++) {
       const cnt = contours.get(i);
       const peri = cv.arcLength(cnt, true);
-      console.log("peri:"+ peri);
+      //console.log("peri:"+ peri);
       if(peri < 100)
         continue;
       const eps = Math.max(1e-3, epsilonRatio * peri);  // avoid epsilon=0
@@ -1046,13 +1053,13 @@ function drawLensAt(clientX: number, clientY: number) {
         ctx.lineTo(p.x, canvasRef.height);
         ctx.stroke();
       
-        if(cv !== undefined)
+        if(cv !== undefined && procActive())
         {
-        const w=roi().w;
-        const h=roi().h;
-        const x = canvasRef.width/2-w/2;
-        const y = canvasRef.height/2-h/2;
-        thresholdPatchWithContoursDark(canvasRef, roi().x, roi().y, roi().w, roi().h, 100);
+          const w=roi().w;
+          const h=roi().h;
+          const x = canvasRef.width/2-w/2;
+          const y = canvasRef.height/2-h/2;
+          thresholdPatchWithContoursDark(canvasRef, roi().x, roi().y, roi().w, roi().h, threshold());
         }
        // DrawOverlay();
       }
@@ -1481,7 +1488,12 @@ const hexProper = () => {
     //let timerId:number=0;
     onMount(async () => {
 
-    
+      const v = {hej:0};
+      console.log(v);
+      v.hej=12;
+      console.log(v);
+
+
       window.addEventListener("opencv-ready", onCvReady, { once: true });
     
         //img.onload = () => {
@@ -1666,7 +1678,7 @@ const activeTarget = createMemo<Target | undefined>(() => {
       roi={roi}
       onChange={setRoi}
       minSize={12}
-      visible={true}
+      visible={procActive()}
     />
         <div class="lens" ref={lensDiv} style={lensStyle}>
             <canvas ref={lensCanvas}  style={lensCanvStyle}/>
@@ -1754,13 +1766,31 @@ const activeTarget = createMemo<Target | undefined>(() => {
 
      <div style={{ padding: "16px", color: "#e5e7eb", background: "#0b1220", height: "100vh" }}>
       <SlideInMenu
-        onConfineThresh={() => console.log("Confine & Thresh")}
+        procActive={procActive()}
+        invert={invPolarity()}
+        threshold = {threshold()}
+        onChangeProcActive={(a) => {
+          setProcActive(a);  
+          console.log("Active"+ a)
+          }
+        }
         onSelectPolygons={() => console.log("SelectPolygons")}
         onCreateMss={() => console.log("Create MSS Polygons")}
         onAdjustMss={() => console.log("Adjust MSS Polygons")}
-        onChangeThreshold={(v) => console.log("threshold", v)}
-        onChangeEpsilon={(v) => console.log("epsilon", v)}
-        onChangeInvert={(v) => console.log("invert", v)}
+        onChangeThreshold={(v) => {
+          console.log("threshold", v)
+          setThreshold(v);
+          }
+        }
+        onChangeEpsilon={(v) => {
+          setEps(v);
+          console.log("epsilon", v)}
+        }
+        onChangeInvert={(v) => {
+        //  console.log("invert", v);
+          setInvPolarity(v);
+          }
+        }
       >
         {/* trigger button */}
         <div style="display:inline-block;background:#0f2036;border:1px solid #27456e;color:#e5e7eb;padding:8px 12px;border-radius:10px;cursor:pointer;">
